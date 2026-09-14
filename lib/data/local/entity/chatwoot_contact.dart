@@ -27,19 +27,19 @@ class ChatwootContact extends Equatable {
   ///Full name of contact
   @JsonKey()
   @HiveField(3)
-  final String name;
+  final String? name;
 
   ///Email of contact
   @JsonKey()
   @HiveField(4)
-  final String email;
+  final String? email;
 
   ChatwootContact({
     required this.id,
     required this.contactIdentifier,
     required this.pubsubToken,
-    required this.name,
-    required this.email,
+    this.name,
+    this.email,
   });
 
   factory ChatwootContact.fromJson(Map<String, dynamic> json) =>

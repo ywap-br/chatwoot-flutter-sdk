@@ -94,6 +94,28 @@ void main() {
       expect(dao.getConversation(), null);
     });
 
+    test(
+        'Given multiple conversations are saved when saveConversations is called, then getConversations should return all saved conversations',
+        () async {
+      //WHEN
+      await dao.saveConversations([testConversation]);
+
+      //THEN
+      final conversations = dao.getConversations();
+      expect(conversations.length, 1);
+      expect(conversations.first, testConversation);
+    });
+
+    test(
+        'Given active conversation is set when setActiveConversation is called, then getConversation should return active conversation',
+        () async {
+      //WHEN
+      await dao.setActiveConversation(testConversation);
+
+      //THEN
+      expect(dao.getConversation(), testConversation);
+    });
+
     tearDown(() {
       return Future(() async {
         try {

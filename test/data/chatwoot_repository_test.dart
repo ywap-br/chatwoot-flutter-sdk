@@ -81,6 +81,9 @@ void main() {
       reset(mockUserDao);
       reset(mockMessagesDao);
       when(mockContactDao.getContact()).thenReturn(testContact);
+      when(mockChatwootCallbacks.onConversationsRetrieved).thenReturn(null);
+      when(mockConversationDao.saveConversations(any))
+          .thenAnswer((_) => Future.microtask(() {}));
       mockWebSocketStream = StreamController.broadcast();
       when(mockWebSocketChannel.stream)
           .thenAnswer((_) => mockWebSocketStream.stream);
@@ -241,6 +244,86 @@ void main() {
       verifyNever(mockUserDao.saveUser(testUser));
       verify(mockContactDao.saveContact(testContact));
       verify(mockConversationDao.saveConversation(testConversation));
+    });
+
+    test(
+        'Given conversations are successfully loaded when loadConversations is called, then conversations should be saved and callback triggered',
+        () async {
+      //GIVEN
+      final testConversations = [testConversation];
+      when(mockChatwootClientService.getConversations())
+          .thenAnswer((_) => Future.value(testConversations));
+      when(mockConversationDao.saveConversations(any))
+          .thenAnswer((_) => Future.microtask(() {}));
+      when(mockChatwootCallbacks.onConversationsRetrieved).thenReturn((_) {});
+
+      //WHEN
+      final result = await repo.loadConversations();
+
+      //THEN
+      verify(mockChatwootClientService.getConversations());
+      verify(mockConversationDao.saveConversations(testConversations));
+      verify(mockChatwootCallbacks.onConversationsRetrieved?.call(testConversations));
+      expect(result, testConversations);
+    });
+
+    test(
+        'Given new conversation is successfully created when createNewConversation is called, then conversation should be saved and returned',
+        () async {
+      //GIVEN
+      when(mockChatwootClientService.createConversation())
+          .thenAnswer((_) => Future.value(testConversation));
+      when(mockConversationDao.saveConversation(any))
+          .thenAnswer((_) => Future.microtask(() {}));
+      when(mockConversationDao.getConversations()).thenReturn([]);
+      when(mockConversationDao.saveConversations(any))
+          .thenAnswer((_) => Future.microtask(() {}));
+      when(mockChatwootCallbacks.onConversationCreated).thenReturn((_) {});
+
+      //WHEN
+      final result = await repo.createNewConversation();
+
+      //THEN
+      verify(mockChatwootClientService.createConversation());
+      verify(mockConversationDao.saveConversation(testConversation));
+      verify(mockChatwootCallbacks.onConversationCreated?.call(testConversation));
+      expect(result, testConversation);
+    });
+
+    test(
+        'Given active conversation is set when setActiveConversation is called, then dao should be updated and messages fetched',
+        () async {
+      //GIVEN
+      when(mockConversationDao.setActiveConversation(any))
+          .thenAnswer((_) => Future.microtask(() {}));
+      when(mockChatwootClientService.getAllMessages())
+          .thenAnswer((_) => Future.value([testMessage]));
+      when(mockMessagesDao.saveAllMessages(any))
+          .thenAnswer((_) => Future.microtask(() {}));
+      when(mockChatwootCallbacks.onMessagesRetrieved).thenReturn((_) {});
+
+      //WHEN
+      await repo.setActiveConversation(testConversation);
+
+      //THEN
+      verify(mockConversationDao.setActiveConversation(testConversation));
+      verify(mockChatwootClientService.getAllMessages());
+    });
+
+    test(
+        'Given getPersistedConversations is called, then conversations from dao should be returned',
+        () {
+      //GIVEN
+      final testConversations = [testConversation];
+      when(mockConversationDao.getConversations()).thenReturn(testConversations);
+      when(mockChatwootCallbacks.onPersistedConversationsRetrieved).thenReturn((_) {});
+
+      //WHEN
+      final result = repo.getPersistedConversations();
+
+      //THEN
+      expect(result, testConversations);
+      verify(mockChatwootCallbacks.onPersistedConversationsRetrieved?.call(testConversations));
     });
 
     test(

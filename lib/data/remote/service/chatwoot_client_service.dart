@@ -27,6 +27,10 @@ abstract class ChatwootClientService {
 
   Future<List<ChatwootConversation>> getConversations();
 
+  Future<ChatwootConversation> createConversation();
+
+  Future<List<ChatwootMessage>> getMessagesForConversation(int conversationId);
+
   Future<ChatwootMessage> createMessage(ChatwootNewMessageRequest request);
 
   Future<ChatwootMessage> updateMessage(String messageIdentifier, update);
@@ -60,7 +64,11 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
       }
     } on DioException catch (e) {
       throw ChatwootClientException(
-          e.message ?? '', ChatwootClientExceptionType.SEND_MESSAGE_FAILED);
+          ChatwootClientException.extractError(e),
+          ChatwootClientExceptionType.SEND_MESSAGE_FAILED);
+    } catch (e) {
+      throw ChatwootClientException(
+          e.toString(), ChatwootClientExceptionType.SEND_MESSAGE_FAILED);
     }
   }
 
@@ -81,7 +89,11 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
       }
     } on DioException catch (e) {
       throw ChatwootClientException(
-          e.message ?? '', ChatwootClientExceptionType.GET_MESSAGES_FAILED);
+          ChatwootClientException.extractError(e),
+          ChatwootClientExceptionType.GET_MESSAGES_FAILED);
+    } catch (e) {
+      throw ChatwootClientException(
+          e.toString(), ChatwootClientExceptionType.GET_MESSAGES_FAILED);
     }
   }
 
@@ -100,7 +112,11 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
       }
     } on DioException catch (e) {
       throw ChatwootClientException(
-          e.message ?? '', ChatwootClientExceptionType.GET_CONTACT_FAILED);
+          ChatwootClientException.extractError(e),
+          ChatwootClientExceptionType.GET_CONTACT_FAILED);
+    } catch (e) {
+      throw ChatwootClientException(
+          e.toString(), ChatwootClientExceptionType.GET_CONTACT_FAILED);
     }
   }
 
@@ -121,7 +137,60 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
       }
     } on DioException catch (e) {
       throw ChatwootClientException(
-          e.message ?? '', ChatwootClientExceptionType.GET_CONVERSATION_FAILED);
+          ChatwootClientException.extractError(e),
+          ChatwootClientExceptionType.GET_CONVERSATION_FAILED);
+    } catch (e) {
+      throw ChatwootClientException(
+          e.toString(), ChatwootClientExceptionType.GET_CONVERSATION_FAILED);
+    }
+  }
+
+  ///Creates a new conversation for current contact
+  @override
+  Future<ChatwootConversation> createConversation() async {
+    try {
+      final createResponse = await _dio.post(
+          "/public/api/v1/inboxes/${ChatwootClientApiInterceptor.INTERCEPTOR_INBOX_IDENTIFIER_PLACEHOLDER}/contacts/${ChatwootClientApiInterceptor.INTERCEPTOR_CONTACT_IDENTIFIER_PLACEHOLDER}/conversations");
+      if ((createResponse.statusCode ?? 0).isBetween(199, 300)) {
+        return ChatwootConversation.fromJson(createResponse.data);
+      } else {
+        throw ChatwootClientException(
+            createResponse.statusMessage ?? "unknown error",
+            ChatwootClientExceptionType.CREATE_CONVERSATION_FAILED);
+      }
+    } on DioException catch (e) {
+      throw ChatwootClientException(
+          ChatwootClientException.extractError(e),
+          ChatwootClientExceptionType.CREATE_CONVERSATION_FAILED);
+    } catch (e) {
+      throw ChatwootClientException(
+          e.toString(), ChatwootClientExceptionType.CREATE_CONVERSATION_FAILED);
+    }
+  }
+
+  ///Gets all messages of a specific conversation
+  @override
+  Future<List<ChatwootMessage>> getMessagesForConversation(
+      int conversationId) async {
+    try {
+      final createResponse = await _dio.get(
+          "/public/api/v1/inboxes/${ChatwootClientApiInterceptor.INTERCEPTOR_INBOX_IDENTIFIER_PLACEHOLDER}/contacts/${ChatwootClientApiInterceptor.INTERCEPTOR_CONTACT_IDENTIFIER_PLACEHOLDER}/conversations/$conversationId/messages");
+      if ((createResponse.statusCode ?? 0).isBetween(199, 300)) {
+        return (createResponse.data as List<dynamic>)
+            .map(((json) => ChatwootMessage.fromJson(json)))
+            .toList();
+      } else {
+        throw ChatwootClientException(
+            createResponse.statusMessage ?? "unknown error",
+            ChatwootClientExceptionType.GET_MESSAGES_FAILED);
+      }
+    } on DioException catch (e) {
+      throw ChatwootClientException(
+          ChatwootClientException.extractError(e),
+          ChatwootClientExceptionType.GET_MESSAGES_FAILED);
+    } catch (e) {
+      throw ChatwootClientException(
+          e.toString(), ChatwootClientExceptionType.GET_MESSAGES_FAILED);
     }
   }
 
@@ -141,7 +210,11 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
       }
     } on DioException catch (e) {
       throw ChatwootClientException(
-          e.message ?? '', ChatwootClientExceptionType.UPDATE_CONTACT_FAILED);
+          ChatwootClientException.extractError(e),
+          ChatwootClientExceptionType.UPDATE_CONTACT_FAILED);
+    } catch (e) {
+      throw ChatwootClientException(
+          e.toString(), ChatwootClientExceptionType.UPDATE_CONTACT_FAILED);
     }
   }
 
@@ -162,7 +235,11 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
       }
     } on DioException catch (e) {
       throw ChatwootClientException(
-          e.message ?? '', ChatwootClientExceptionType.UPDATE_MESSAGE_FAILED);
+          ChatwootClientException.extractError(e),
+          ChatwootClientExceptionType.UPDATE_MESSAGE_FAILED);
+    } catch (e) {
+      throw ChatwootClientException(
+          e.toString(), ChatwootClientExceptionType.UPDATE_MESSAGE_FAILED);
     }
   }
 

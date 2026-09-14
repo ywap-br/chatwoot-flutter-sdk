@@ -214,3 +214,57 @@ final chatwootCallbacks = ChatwootCallbacks(
 | enablePersistance | true    | bool              | Enables persistence of chatwoot client instance's contact, conversation and messages to disk <br>for convenience.<br>true - persists chatwoot client instance's data(contact, conversation and messages) to disk. To clear persisted <br>data call ChatwootClient.clearData or ChatwootClient.clearAllData<br>false - holds chatwoot client instance's data in memory and is cleared as<br>soon as chatwoot client instance is disposed<br>Setting |
 | user              | null    | ChatwootUser      | Custom user details to be attached to chatwoot contact                                                                                                                                                                                                                                                                                                                                                                                             |
 | callbacks         | null    | ChatwootCallbacks | Callbacks for handling chatwoot events                                                                                                                                                                                                                                                                                                                                                                                                             |
+
+### c. Using Native Flutter Chat with Recent Conversations (`ChatwootChat`)
+
+Render a complete native chat UI with conversation history, list of recent conversations, and seamless transitions between list and conversation.
+
+```dart
+ChatwootChat(
+  baseUrl: "https://app.chatwoot.com",
+  inboxIdentifier: "your_inbox_identifier",
+  user: ChatwootUser(
+    identifier: "user@example.com",
+    name: "User Name",
+    email: "user@example.com",
+  ),
+  showConversationHistory: true, // Displays "Recent conversations" list before chat
+  l10n: const ChatwootL10n(
+    recentConversationsTitle: "Conversas recentes",
+    startNewConversationText: "Iniciar nova conversa",
+    noConversationsText: "Nenhuma conversa encontrada",
+  ),
+)
+```
+
+### d. Using Standalone Conversation History Widget (`ChatwootRecentConversations`)
+
+Embed the recent conversations list anywhere in your app without coupling:
+
+```dart
+ChatwootRecentConversations(
+  conversations: conversationsList,
+  onConversationSelected: (conversation) {
+    // Open conversation details or switch chat
+  },
+  onNewConversation: () {
+    // Create new conversation
+  },
+  onRefresh: () async {
+    // Refresh conversations
+  },
+)
+```
+
+### e. Using Dialog Modal with Conversation History (`ChatwootChatDialog`)
+
+```dart
+ChatwootChatDialog.show(
+  context,
+  baseUrl: "https://app.chatwoot.com",
+  inboxIdentifier: "your_inbox_identifier",
+  title: "Atendimento",
+  user: chatwootUser,
+  showConversationHistory: true,
+);
+```

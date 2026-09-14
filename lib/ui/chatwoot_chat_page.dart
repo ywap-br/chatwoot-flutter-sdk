@@ -1,10 +1,12 @@
 import 'package:chatwoot_sdk/chatwoot_callbacks.dart';
 import 'package:chatwoot_sdk/chatwoot_client.dart';
+import 'package:chatwoot_sdk/data/local/entity/chatwoot_conversation.dart';
 import 'package:chatwoot_sdk/data/local/entity/chatwoot_message.dart';
 import 'package:chatwoot_sdk/data/local/entity/chatwoot_user.dart';
 import 'package:chatwoot_sdk/data/remote/chatwoot_client_exception.dart';
 import 'package:chatwoot_sdk/ui/chatwoot_chat_theme.dart';
 import 'package:chatwoot_sdk/ui/chatwoot_l10n.dart';
+import 'package:chatwoot_sdk/ui/chatwoot_recent_conversations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
@@ -13,7 +15,6 @@ import 'package:uuid/uuid.dart';
 
 ///Chatwoot chat widget
 /// {@category FlutterClientSdk}
-@deprecated
 class ChatwootChat extends StatefulWidget {
   /// Specifies a custom app bar for chatwoot page widget
   final PreferredSizeWidget? appBar;
@@ -113,6 +114,15 @@ class ChatwootChat extends StatefulWidget {
   ///Horizontal padding is reduced if set to true
   final bool isPresentedInDialog;
 
+  /// Whether to show the recent conversations history list before opening chat
+  final bool showConversationHistory;
+
+  /// Triggered when conversations are retrieved
+  final void Function(List<ChatwootConversation>)? onConversationsRetrieved;
+
+  /// Triggered when a new conversation is created
+  final void Function(ChatwootConversation)? onConversationCreated;
+
   const ChatwootChat(
       {Key? key,
       required this.baseUrl,
@@ -140,22 +150,28 @@ class ChatwootChat extends StatefulWidget {
       this.onMessageUpdated,
       this.onPersistedMessagesRetrieved,
       this.onMessagesRetrieved,
+      this.onConversationsRetrieved,
+      this.onConversationCreated,
       this.onConversationStartedTyping,
       this.onConversationStoppedTyping,
       this.onConversationIsOnline,
       this.onConversationIsOffline,
       this.onError,
-      this.isPresentedInDialog = false})
+      this.isPresentedInDialog = false,
+      this.showConversationHistory = true})
       : super(key: key);
 
   @override
   _ChatwootChatState createState() => _ChatwootChatState();
 }
 
-@deprecated
 class _ChatwootChatState extends State<ChatwootChat> {
   ///
   List<types.Message> _messages = [];
+  List<ChatwootConversation> _conversations = [];
+  ChatwootConversation? _activeConversation;
+  late bool _showingChat;
+  bool _isLoadingConversations = true;
 
   late String status;
 
@@ -168,6 +184,7 @@ class _ChatwootChatState extends State<ChatwootChat> {
   @override
   void initState() {
     super.initState();
+    _showingChat = !widget.showConversationHistory;
 
     if (widget.user == null) {
       _user = types.User(id: idGen.v4());
@@ -246,6 +263,34 @@ class _ChatwootChatState extends State<ChatwootChat> {
         _handleMessageSent(textMessage);
         widget.onMessageSent?.call(chatwootMessage);
       },
+      onConversationsRetrieved: (conversations) {
+        if (mounted) {
+          setState(() {
+            _conversations = conversations;
+            _isLoadingConversations = false;
+          });
+        }
+        widget.onConversationsRetrieved?.call(conversations);
+      },
+      onPersistedConversationsRetrieved: (conversations) {
+        if (mounted) {
+          setState(() {
+            _conversations = conversations;
+            _isLoadingConversations = false;
+          });
+        }
+      },
+      onConversationCreated: (conversation) {
+        if (mounted) {
+          setState(() {
+            _activeConversation = conversation;
+            _messages = [];
+            _showingChat = true;
+            _isLoadingConversations = false;
+          });
+        }
+        widget.onConversationCreated?.call(conversation);
+      },
       onConversationResolved: () {
         final resolvedMessage = types.TextMessage(
             id: idGen.v4(),
@@ -262,7 +307,7 @@ class _ChatwootChatState extends State<ChatwootChat> {
         if (error.type == ChatwootClientExceptionType.SEND_MESSAGE_FAILED) {
           _handleSendMessageFailed(error.data);
         }
-        print("Ooops! Something went wrong. Error Cause: ${error.cause}");
+        print("Ooops! Something went wrong. [${error.type}] Error Cause: ${error.cause}");
         widget.onError?.call(error);
       },
     );
@@ -274,10 +319,18 @@ class _ChatwootChatState extends State<ChatwootChat> {
             enablePersistence: widget.enablePersistence,
             callbacks: chatwootCallbacks)
         .then((client) {
-      setState(() {
-        chatwootClient = client;
-        chatwootClient!.loadMessages();
-      });
+      if (mounted) {
+        setState(() {
+          chatwootClient = client;
+          _activeConversation = client.getActiveConversation();
+          _conversations = client.getPersistedConversations();
+          if (_conversations.isNotEmpty) {
+            _isLoadingConversations = false;
+          }
+          client.loadMessages();
+          client.loadConversations();
+        });
+      }
     }).onError((error, stackTrace) {
       widget.onError?.call(ChatwootClientException(
           error.toString(), ChatwootClientExceptionType.CREATE_CLIENT_FAILED));
@@ -395,11 +448,101 @@ class _ChatwootChatState extends State<ChatwootChat> {
     widget.onSendPressed?.call(message);
   }
 
+  void _handleSelectConversation(ChatwootConversation conversation) {
+    setState(() {
+      _activeConversation = conversation;
+      _showingChat = true;
+      _messages = conversation.messages
+          .map((message) => _chatwootMessageToTextMessage(message))
+          .toList();
+      final now = DateTime.now().millisecondsSinceEpoch;
+      _messages.sort((a, b) {
+        return (b.createdAt ?? now).compareTo(a.createdAt ?? now);
+      });
+    });
+    chatwootClient?.setActiveConversation(conversation);
+  }
+
+  Future<void> _handleNewConversation() async {
+    try {
+      setState(() {
+        _isLoadingConversations = true;
+      });
+      final conversation = await chatwootClient?.createConversation();
+      if (conversation != null && mounted) {
+        setState(() {
+          _activeConversation = conversation;
+          _messages = [];
+          _showingChat = true;
+          _isLoadingConversations = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingConversations = false;
+        });
+      }
+    }
+  }
+
+  void _handleBackToConversations() {
+    setState(() {
+      _showingChat = false;
+    });
+    chatwootClient?.loadConversations();
+  }
+
   @override
   Widget build(BuildContext context) {
     final horizontalPadding = widget.isPresentedInDialog ? 8.0 : 16.0;
+
+    if (!_showingChat && widget.showConversationHistory) {
+      return Scaffold(
+        appBar: widget.appBar ??
+            AppBar(
+              title: Text(widget.l10n.recentConversationsTitle),
+              backgroundColor:
+                  widget.theme?.primaryColor ?? CHATWOOT_COLOR_PRIMARY,
+              foregroundColor: Colors.white,
+              elevation: 0,
+            ),
+        backgroundColor: widget.theme?.backgroundColor,
+        body: ChatwootRecentConversations(
+          conversations: _conversations,
+          onConversationSelected: _handleSelectConversation,
+          onNewConversation: _handleNewConversation,
+          onRefresh: () async {
+            await chatwootClient?.loadConversations();
+          },
+          theme: widget.theme ?? const ChatwootChatTheme(),
+          l10n: widget.l10n,
+          dateFormat: widget.dateFormat,
+          timeFormat: widget.timeFormat,
+          isLoading: _isLoadingConversations && _conversations.isEmpty,
+        ),
+      );
+    }
+
+    PreferredSizeWidget? chatAppBar = widget.appBar;
+    if (chatAppBar == null && widget.showConversationHistory) {
+      chatAppBar = AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: widget.l10n.backButtonTooltip,
+          onPressed: _handleBackToConversations,
+        ),
+        title: Text(_activeConversation != null
+            ? "Conversa #${_activeConversation!.id}"
+            : widget.l10n.recentConversationsTitle),
+        backgroundColor: widget.theme?.primaryColor ?? CHATWOOT_COLOR_PRIMARY,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      );
+    }
+
     return Scaffold(
-      appBar: widget.appBar,
+      appBar: chatAppBar,
       backgroundColor: widget.theme?.backgroundColor,
       body: Column(
         children: [
@@ -419,7 +562,7 @@ class _ChatwootChatState extends State<ChatwootChat> {
                 showUserAvatars: widget.showUserAvatars,
                 showUserNames: widget.showUserNames,
                 timeFormat: widget.timeFormat ?? DateFormat.Hm(),
-                dateFormat: widget.timeFormat ?? DateFormat("EEEE MMMM d"),
+                dateFormat: widget.dateFormat ?? DateFormat("EEEE MMMM d"),
                 theme: widget.theme ?? ChatwootChatTheme(),
                 l10n: widget.l10n,
               ),

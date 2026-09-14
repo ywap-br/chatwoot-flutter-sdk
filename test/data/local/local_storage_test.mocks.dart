@@ -51,6 +51,39 @@ class MockChatwootConversationDao extends _i1.Mock
       ) as _i3.Future<void>);
 
   @override
+  _i3.Future<void> saveConversations(
+          List<_i4.ChatwootConversation>? conversations) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #saveConversations,
+          [conversations],
+        ),
+        returnValue: _i3.Future<void>.value(),
+        returnValueForMissingStub: _i3.Future<void>.value(),
+      ) as _i3.Future<void>);
+
+  @override
+  List<_i4.ChatwootConversation> getConversations() => (super.noSuchMethod(
+        Invocation.method(
+          #getConversations,
+          [],
+        ),
+        returnValue: <_i4.ChatwootConversation>[],
+      ) as List<_i4.ChatwootConversation>);
+
+  @override
+  _i3.Future<void> setActiveConversation(
+          _i4.ChatwootConversation? conversation) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setActiveConversation,
+          [conversation],
+        ),
+        returnValue: _i3.Future<void>.value(),
+        returnValueForMissingStub: _i3.Future<void>.value(),
+      ) as _i3.Future<void>);
+
+  @override
   _i3.Future<void> deleteConversation() => (super.noSuchMethod(
         Invocation.method(
           #deleteConversation,
@@ -249,6 +282,39 @@ class MockPersistedChatwootConversationDao extends _i1.Mock
         returnValue: _i3.Future<void>.value(),
         returnValueForMissingStub: _i3.Future<void>.value(),
       ) as _i3.Future<void>);
+
+  @override
+  _i3.Future<void> saveConversations(
+          List<_i4.ChatwootConversation>? conversations) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #saveConversations,
+          [conversations],
+        ),
+        returnValue: _i3.Future<void>.value(),
+        returnValueForMissingStub: _i3.Future<void>.value(),
+      ) as _i3.Future<void>);
+
+  @override
+  _i3.Future<void> setActiveConversation(
+          _i4.ChatwootConversation? conversation) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setActiveConversation,
+          [conversation],
+        ),
+        returnValue: _i3.Future<void>.value(),
+        returnValueForMissingStub: _i3.Future<void>.value(),
+      ) as _i3.Future<void>);
+
+  @override
+  List<_i4.ChatwootConversation> getConversations() => (super.noSuchMethod(
+        Invocation.method(
+          #getConversations,
+          [],
+        ),
+        returnValue: <_i4.ChatwootConversation>[],
+      ) as List<_i4.ChatwootConversation>);
 
   @override
   _i3.Future<void> onDispose() => (super.noSuchMethod(

@@ -1,7 +1,5 @@
 import 'package:chatwoot_sdk/chatwoot_sdk.dart';
 import 'package:chatwoot_sdk/data/chatwoot_repository.dart';
-import 'package:chatwoot_sdk/data/local/entity/chatwoot_contact.dart';
-import 'package:chatwoot_sdk/data/local/entity/chatwoot_conversation.dart';
 import 'package:chatwoot_sdk/data/remote/requests/chatwoot_action_data.dart';
 import 'package:chatwoot_sdk/data/remote/requests/chatwoot_new_message_request.dart';
 import 'package:chatwoot_sdk/di/modules.dart';
@@ -49,6 +47,34 @@ class ChatwootClient {
   void loadMessages() async {
     _repository.getPersistedMessages();
     await _repository.getMessages();
+  }
+
+  /// Retrieves conversations for the contact. If persistence is enabled,
+  /// [ChatwootCallbacks.onPersistedConversationsRetrieved] will be triggered with persisted conversations.
+  /// On successful fetch from remote server, [ChatwootCallbacks.onConversationsRetrieved] will be triggered.
+  Future<List<ChatwootConversation>> loadConversations() async {
+    _repository.getPersistedConversations();
+    return await _repository.loadConversations();
+  }
+
+  /// Gets persisted conversations from local storage
+  List<ChatwootConversation> getPersistedConversations() {
+    return _repository.getPersistedConversations();
+  }
+
+  /// Creates a new conversation on remote server and sets it as active
+  Future<ChatwootConversation> createConversation() async {
+    return await _repository.createNewConversation();
+  }
+
+  /// Sets the active conversation and loads its messages
+  Future<void> setActiveConversation(ChatwootConversation conversation) async {
+    await _repository.setActiveConversation(conversation);
+  }
+
+  /// Gets the currently active conversation
+  ChatwootConversation? getActiveConversation() {
+    return _repository.getActiveConversation();
   }
 
   /// Sends chatwoot message. The echoId is your temporary message id. When message sends successfully

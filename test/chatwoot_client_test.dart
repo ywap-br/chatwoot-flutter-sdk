@@ -1,5 +1,7 @@
 import 'package:chatwoot_sdk/chatwoot_client.dart';
 import 'package:chatwoot_sdk/data/chatwoot_repository.dart';
+import 'package:chatwoot_sdk/data/local/entity/chatwoot_contact.dart';
+import 'package:chatwoot_sdk/data/local/entity/chatwoot_conversation.dart';
 import 'package:chatwoot_sdk/data/local/entity/chatwoot_user.dart';
 import 'package:chatwoot_sdk/data/remote/requests/chatwoot_action_data.dart';
 import 'package:chatwoot_sdk/di/modules.dart';
@@ -225,6 +227,57 @@ void main() {
       verify(mockRepository.initialize(testUser));
       expect(result.baseUrl, equals(testBaseUrl));
       expect(result.inboxIdentifier, equals(testInboxIdentifier));
+    });
+
+    test(
+        'Given conversations load successfully when a loadConversations is called, then repository should be called',
+        () async {
+      //GIVEN
+      when(mockRepository.loadConversations())
+          .thenAnswer((_) => Future.value(<ChatwootConversation>[]));
+      when(mockRepository.getPersistedConversations()).thenReturn(<ChatwootConversation>[]);
+
+      //WHEN
+      await client.loadConversations();
+
+      //THEN
+      verify(mockRepository.getPersistedConversations());
+      verify(mockRepository.loadConversations());
+    });
+
+    test(
+        'Given conversation is created successfully when a createConversation is called, then repository should be called',
+        () async {
+      //GIVEN
+      final testContact = ChatwootContact(id: 1, contactIdentifier: "c_1", pubsubToken: "token", name: "test", email: "test@test.com");
+      final testConv = ChatwootConversation(
+          id: 1, inboxId: 1, contact: testContact, messages: const []);
+      when(mockRepository.createNewConversation())
+          .thenAnswer((_) => Future.value(testConv));
+
+      //WHEN
+      final result = await client.createConversation();
+
+      //THEN
+      verify(mockRepository.createNewConversation());
+      expect(result, testConv);
+    });
+
+    test(
+        'Given conversation is set active when setActiveConversation is called, then repository should be called',
+        () async {
+      //GIVEN
+      final testContact = ChatwootContact(id: 1, contactIdentifier: "c_1", pubsubToken: "token", name: "test", email: "test@test.com");
+      final testConv = ChatwootConversation(
+          id: 1, inboxId: 1, contact: testContact, messages: const []);
+      when(mockRepository.setActiveConversation(any))
+          .thenAnswer((_) => Future.microtask(() {}));
+
+      //WHEN
+      await client.setActiveConversation(testConv);
+
+      //THEN
+      verify(mockRepository.setActiveConversation(testConv));
     });
   });
 }

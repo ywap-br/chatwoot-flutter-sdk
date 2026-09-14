@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 /// {@category FlutterClientSdk}
 class ChatwootClientException implements Exception {
   String cause;
@@ -5,6 +7,25 @@ class ChatwootClientException implements Exception {
   ChatwootClientExceptionType type;
 
   ChatwootClientException(this.cause, this.type, {this.data});
+
+  static String extractError(dynamic e) {
+    if (e is DioException) {
+      if (e.response?.data != null) {
+        return "${e.response?.statusCode}: ${e.response?.data}";
+      }
+      if (e.error != null) {
+        return e.error.toString();
+      }
+      if (e.message != null && e.message!.isNotEmpty) {
+        return e.message!;
+      }
+      return e.toString();
+    }
+    return e.toString();
+  }
+
+  @override
+  String toString() => "ChatwootClientException: [$type] $cause";
 }
 
 /// {@category FlutterClientSdk}

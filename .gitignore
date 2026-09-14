@@ -77,3 +77,5 @@ build/
 !**/ios/**/default.pbxuser
 !**/ios/**/default.perspectivev3
 /coverage/
+.serena/
+**/ios/Flutter/ephemeral/

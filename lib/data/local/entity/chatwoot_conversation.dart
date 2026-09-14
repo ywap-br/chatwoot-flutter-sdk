@@ -1,5 +1,4 @@
 import 'package:chatwoot_sdk/chatwoot_sdk.dart';
-import 'package:chatwoot_sdk/data/local/entity/chatwoot_contact.dart';
 import 'package:chatwoot_sdk/data/local/local_storage.dart';
 import 'package:equatable/equatable.dart';
 import 'package:hive/hive.dart';
@@ -20,7 +19,7 @@ class ChatwootConversation extends Equatable {
   final int inboxId;
 
   ///List of all messages from the conversation
-  @JsonKey()
+  @JsonKey(defaultValue: <ChatwootMessage>[])
   @HiveField(2)
   final List<ChatwootMessage> messages;
 
@@ -29,11 +28,30 @@ class ChatwootConversation extends Equatable {
   @HiveField(3)
   final ChatwootContact contact;
 
-  ChatwootConversation(
-      {required this.id,
-      required this.inboxId,
-      required this.messages,
-      required this.contact});
+  ///Status of the conversation ("open", "resolved", "pending", "snoozed")
+  @JsonKey()
+  @HiveField(4)
+  final String? status;
+
+  ///Creation timestamp of the conversation
+  @JsonKey(name: "created_at")
+  @HiveField(5)
+  final dynamic createdAt;
+
+  ///Unread messages count
+  @JsonKey(name: "unread_count")
+  @HiveField(6)
+  final int? unreadCount;
+
+  ChatwootConversation({
+    required this.id,
+    required this.inboxId,
+    this.messages = const [],
+    required this.contact,
+    this.status,
+    this.createdAt,
+    this.unreadCount,
+  });
 
   factory ChatwootConversation.fromJson(Map<String, dynamic> json) =>
       _$ChatwootConversationFromJson(json);
@@ -41,5 +59,6 @@ class ChatwootConversation extends Equatable {
   Map<String, dynamic> toJson() => _$ChatwootConversationToJson(this);
 
   @override
-  List<Object?> get props => [id, inboxId, messages, contact];
+  List<Object?> get props =>
+      [id, inboxId, messages, contact, status, createdAt, unreadCount];
 }

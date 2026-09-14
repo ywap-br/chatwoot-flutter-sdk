@@ -9,7 +9,6 @@ import 'chatwoot_chat_page.dart';
 
 ///Chatwoot chat modal widget
 /// {@category FlutterClientSdk}
-@deprecated
 class ChatwootChatDialog extends StatefulWidget {
   static show(
     BuildContext context, {
@@ -24,6 +23,7 @@ class ChatwootChatDialog extends StatefulWidget {
     ChatwootL10n? l10n,
     DateFormat? timeFormat,
     DateFormat? dateFormat,
+    bool showConversationHistory = true,
   }) {
     showDialog(
         context: context,
@@ -40,6 +40,7 @@ class ChatwootChatDialog extends StatefulWidget {
             l10n: l10n,
             timeFormat: timeFormat,
             dateFormat: dateFormat,
+            showConversationHistory: showConversationHistory,
           );
         });
   }
@@ -83,6 +84,9 @@ class ChatwootChatDialog extends StatefulWidget {
   /// See [Chat.dateFormat]
   final DateFormat? dateFormat;
 
+  /// Whether to show recent conversations history list before opening chat
+  final bool showConversationHistory;
+
   const ChatwootChatDialog({
     Key? key,
     required this.baseUrl,
@@ -96,13 +100,13 @@ class ChatwootChatDialog extends StatefulWidget {
     this.l10n,
     this.timeFormat,
     this.dateFormat,
+    this.showConversationHistory = true,
   }) : super(key: key);
 
   @override
   _ChatwootChatDialogState createState() => _ChatwootChatDialogState();
 }
 
-@deprecated
 class _ChatwootChatDialogState extends State<ChatwootChatDialog> {
   late String status;
   late ChatwootL10n localizedStrings;
@@ -189,6 +193,7 @@ class _ChatwootChatDialogState extends State<ChatwootChatDialog> {
                 enablePersistence: widget.enablePersistence,
                 timeFormat: widget.timeFormat,
                 dateFormat: widget.dateFormat,
+                showConversationHistory: widget.showConversationHistory,
                 theme: ChatwootChatTheme(
                     primaryColor: widget.primaryColor ?? CHATWOOT_COLOR_PRIMARY,
                     secondaryColor: widget.secondaryColor ?? Colors.white,

@@ -4,6 +4,7 @@ import 'dart:core';
 
 import 'package:chatwoot_sdk/chatwoot_callbacks.dart';
 import 'package:chatwoot_sdk/chatwoot_client.dart';
+import 'package:chatwoot_sdk/data/local/entity/chatwoot_conversation.dart';
 import 'package:chatwoot_sdk/data/local/entity/chatwoot_user.dart';
 import 'package:chatwoot_sdk/data/local/local_storage.dart';
 import 'package:chatwoot_sdk/data/remote/chatwoot_client_exception.dart';
@@ -34,6 +35,16 @@ abstract class ChatwootRepository {
   void getPersistedMessages();
 
   Future<void> getMessages();
+
+  Future<List<ChatwootConversation>> loadConversations();
+
+  List<ChatwootConversation> getPersistedConversations();
+
+  Future<ChatwootConversation> createNewConversation();
+
+  Future<void> setActiveConversation(ChatwootConversation conversation);
+
+  ChatwootConversation? getActiveConversation();
 
   void listenForEvents();
 
@@ -94,21 +105,79 @@ class ChatwootRepositoryImpl extends ChatwootRepository {
       final contact = await clientService.getContact();
       localStorage.contactDao.saveContact(contact);
 
-      //refresh conversation
+      //refresh conversations
       final conversations = await clientService.getConversations();
+      await localStorage.conversationDao.saveConversations(conversations);
+      callbacks.onConversationsRetrieved?.call(conversations);
+
       final persistedConversation =
-          localStorage.conversationDao.getConversation()!;
-      final refreshedConversation = conversations.firstWhere(
-          (element) => element.id == persistedConversation.id,
-          orElse: () =>
-              persistedConversation //highly unlikely orElse will be called but still added it just in case
-          );
-      localStorage.conversationDao.saveConversation(refreshedConversation);
+          localStorage.conversationDao.getConversation();
+      if (persistedConversation != null) {
+        final refreshedConversation = conversations.firstWhere(
+            (element) => element.id == persistedConversation.id,
+            orElse: () => persistedConversation);
+        await localStorage.conversationDao.saveConversation(refreshedConversation);
+      } else if (conversations.isNotEmpty) {
+        await localStorage.conversationDao.saveConversation(conversations.last);
+      }
     } on ChatwootClientException catch (e) {
       callbacks.onError?.call(e);
     }
 
     listenForEvents();
+  }
+
+  /// Loads conversations for the contact from remote server
+  @override
+  Future<List<ChatwootConversation>> loadConversations() async {
+    try {
+      final conversations = await clientService.getConversations();
+      await localStorage.conversationDao.saveConversations(conversations);
+      callbacks.onConversationsRetrieved?.call(conversations);
+      return conversations;
+    } on ChatwootClientException catch (e) {
+      callbacks.onError?.call(e);
+      return localStorage.conversationDao.getConversations();
+    }
+  }
+
+  /// Retrieves persisted conversations from local storage
+  @override
+  List<ChatwootConversation> getPersistedConversations() {
+    final conversations = localStorage.conversationDao.getConversations();
+    if (conversations.isNotEmpty) {
+      callbacks.onPersistedConversationsRetrieved?.call(conversations);
+    }
+    return conversations;
+  }
+
+  /// Creates a new conversation on remote server and saves it locally
+  @override
+  Future<ChatwootConversation> createNewConversation() async {
+    try {
+      final conversation = await clientService.createConversation();
+      await localStorage.conversationDao.saveConversation(conversation);
+      final current = localStorage.conversationDao.getConversations();
+      await localStorage.conversationDao.saveConversations([...current, conversation]);
+      callbacks.onConversationCreated?.call(conversation);
+      return conversation;
+    } on ChatwootClientException catch (e) {
+      callbacks.onError?.call(e);
+      rethrow;
+    }
+  }
+
+  /// Sets the active conversation and fetches its messages
+  @override
+  Future<void> setActiveConversation(ChatwootConversation conversation) async {
+    await localStorage.conversationDao.setActiveConversation(conversation);
+    await getMessages();
+  }
+
+  /// Gets the currently active conversation
+  @override
+  ChatwootConversation? getActiveConversation() {
+    return localStorage.conversationDao.getConversation();
   }
 
   ///Sends message to chatwoot inbox

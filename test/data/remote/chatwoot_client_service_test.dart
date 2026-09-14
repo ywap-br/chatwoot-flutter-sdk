@@ -459,5 +459,60 @@ void main() {
       //THEN
       verify(mockWebSocketSink.add(any));
     });
+
+    test(
+        'Given conversation is successfully created when createConversation is called, then return created conversation',
+        () async {
+      //GIVEN
+      final dynamic responseBody =
+          await TestResourceUtil.readJsonResource(fileName: "conversation");
+      when(mockDio.post(any)).thenAnswer(
+          (_) => Future.value(_createSuccessResponse(responseBody)));
+
+      //WHEN
+      final result = await clientService.createConversation();
+
+      //THEN
+      expect(result, ChatwootConversation.fromJson(responseBody));
+    });
+
+    test(
+        'Given create conversation returns with error response when createConversation is called, then throw error',
+        () async {
+      //GIVEN
+      when(mockDio.post(any)).thenAnswer(
+          (_) => Future.value(_createErrorResponse(statusCode: 401, body: {})));
+
+      //WHEN
+      ChatwootClientException? chatwootClientException;
+      try {
+        await clientService.createConversation();
+      } on ChatwootClientException catch (e) {
+        chatwootClientException = e;
+      }
+
+      //THEN
+      expect(chatwootClientException, isNotNull);
+      expect(chatwootClientException!.type,
+          equals(ChatwootClientExceptionType.CREATE_CONVERSATION_FAILED));
+    });
+
+    test(
+        'Given messages are successfully fetched for conversation when getMessagesForConversation is called, then return messages',
+        () async {
+      //GIVEN
+      final dynamic responseBody =
+          await TestResourceUtil.readJsonResource(fileName: "messages");
+      when(mockDio.get(any)).thenAnswer(
+          (_) => Future.value(_createSuccessResponse(responseBody)));
+
+      //WHEN
+      final result = await clientService.getMessagesForConversation(1);
+
+      //THEN
+      final expected =
+          responseBody.map((e) => ChatwootMessage.fromJson(e)).toList();
+      expect(result, equals(expected));
+    });
   });
 }

@@ -1,4 +1,5 @@
 import 'package:chatwoot_sdk/data/chatwoot_repository.dart';
+import 'package:chatwoot_sdk/data/local/entity/chatwoot_conversation.dart';
 import 'package:chatwoot_sdk/data/local/entity/chatwoot_message.dart';
 import 'package:chatwoot_sdk/data/remote/chatwoot_client_exception.dart';
 import 'package:chatwoot_sdk/data/remote/responses/chatwoot_event.dart';
@@ -61,6 +62,15 @@ class ChatwootCallbacks {
   ///Triggered when a conversation's messages is successfully retrieved from remote server
   void Function(List<ChatwootMessage>)? onMessagesRetrieved;
 
+  ///Triggered when all conversations for the contact are successfully retrieved from remote server
+  void Function(List<ChatwootConversation>)? onConversationsRetrieved;
+
+  ///Triggered when all persisted conversations on device are successfully retrieved
+  void Function(List<ChatwootConversation>)? onPersistedConversationsRetrieved;
+
+  ///Triggered when a new conversation is successfully created
+  void Function(ChatwootConversation)? onConversationCreated;
+
   ///Triggered when an agent resolves the current conversation
   void Function()? onConversationResolved;
 
@@ -79,6 +89,9 @@ class ChatwootCallbacks {
     this.onMessageUpdated,
     this.onPersistedMessagesRetrieved,
     this.onMessagesRetrieved,
+    this.onConversationsRetrieved,
+    this.onPersistedConversationsRetrieved,
+    this.onConversationCreated,
     this.onConversationStartedTyping,
     this.onConversationStoppedTyping,
     this.onConversationIsOnline,

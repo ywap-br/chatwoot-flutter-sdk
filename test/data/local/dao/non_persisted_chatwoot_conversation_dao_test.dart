@@ -78,6 +78,28 @@ void main() {
       expect(retrievedConversation, null);
     });
 
+    test(
+        'Given multiple conversations are saved when saveConversations is called, then getConversations should return all saved conversations',
+        () {
+      //WHEN
+      dao.saveConversations([testConversation]);
+
+      //THEN
+      final conversations = dao.getConversations();
+      expect(conversations.length, 1);
+      expect(conversations.first, testConversation);
+    });
+
+    test(
+        'Given active conversation is set when setActiveConversation is called, then getConversation should return active conversation',
+        () {
+      //WHEN
+      dao.setActiveConversation(testConversation);
+
+      //THEN
+      expect(dao.getConversation(), testConversation);
+    });
+
     tearDown(() {
       dao.clearAll();
     });

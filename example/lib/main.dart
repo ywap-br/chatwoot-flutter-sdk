@@ -40,39 +40,80 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
   }
 
+  final testUser = ChatwootUser(
+    identifier: "test@test.com",
+    name: "Tester test",
+    email: "test@test.com",
+  );
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Chatwoot Example"),
-      ),
-      body: ChatwootWidget(
-        websiteToken: "websiteToken",
-        baseUrl: "https://app.chatwoot.com",
-        user: ChatwootUser(
-          identifier: "test@test.com",
-          name: "Tester test",
-          email: "test@test.com",
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text("Chatwoot SDK Example"),
+          bottom: const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.chat_bubble_outline), text: "Native (History)"),
+              Tab(icon: Icon(Icons.web), text: "WebView"),
+            ],
+          ),
         ),
-        locale: "en",
-        closeWidget: () {
-          if (Platform.isAndroid) {
-            SystemNavigator.pop();
-          } else if (Platform.isIOS) {
-            exit(0);
-          }
-        },
-        //attachment only works on android for now
-        onAttachFile: _androidFilePicker,
-        onLoadStarted: () {
-          print("loading widget");
-        },
-        onLoadProgress: (int progress) {
-          print("loading... ${progress}");
-        },
-        onLoadCompleted: () {
-          print("widget loaded");
-        },
+        body: TabBarView(
+          children: [
+            // Native Flutter widget with Recent Conversations history
+            ChatwootChat(
+              baseUrl: "https://app.chatwoot.com",
+              inboxIdentifier: "your_api_inbox_identifier",
+              user: testUser,
+              showConversationHistory: true,
+              l10n: const ChatwootL10n(
+                recentConversationsTitle: "Conversas recentes",
+                startNewConversationText: "Iniciar nova conversa",
+                noConversationsText: "Nenhuma conversa encontrada",
+              ),
+            ),
+            // Official webview widget
+            ChatwootWidget(
+              websiteToken: "websiteToken",
+              baseUrl: "https://app.chatwoot.com",
+              user: testUser,
+              locale: "pt",
+              closeWidget: () {
+                if (Platform.isAndroid) {
+                  SystemNavigator.pop();
+                } else if (Platform.isIOS) {
+                  exit(0);
+                }
+              },
+              onAttachFile: _androidFilePicker,
+              onLoadStarted: () {
+                print("loading widget");
+              },
+              onLoadProgress: (int progress) {
+                print("loading... $progress");
+              },
+              onLoadCompleted: () {
+                print("widget loaded");
+              },
+            ),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          tooltip: "Open Dialog",
+          child: const Icon(Icons.forum),
+          onPressed: () {
+            ChatwootChatDialog.show(
+              context,
+              baseUrl: "https://app.chatwoot.com",
+              inboxIdentifier: "your_api_inbox_identifier",
+              title: "Atendimento",
+              user: testUser,
+              showConversationHistory: true,
+            );
+          },
+        ),
       ),
     );
   }

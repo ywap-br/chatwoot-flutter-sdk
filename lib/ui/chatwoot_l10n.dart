@@ -41,6 +41,24 @@ class ChatwootL10n extends ChatL10n {
   /// Message when agent resolves conversation
   final String unreadMessagesLabel;
 
+  /// Title for recent conversations list
+  final String recentConversationsTitle;
+
+  /// Label for start new conversation button
+  final String startNewConversationText;
+
+  /// Placeholder when there are no conversations
+  final String noConversationsText;
+
+  /// Label for open conversation status
+  final String conversationStatusOpen;
+
+  /// Label for resolved conversation status
+  final String conversationStatusResolved;
+
+  /// Tooltip for back button
+  final String backButtonTooltip;
+
   /// Creates a new chatwoot l10n
   const ChatwootL10n(
       {this.attachmentButtonAccessibilityLabel = "",
@@ -55,7 +73,13 @@ class ChatwootL10n extends ChatL10n {
       this.and = "and",
       this.isTyping = "is typing...",
       this.others = "others",
-      this.unreadMessagesLabel = "Your ticket has been marked as resolved"
+      this.unreadMessagesLabel = "Your ticket has been marked as resolved",
+      this.recentConversationsTitle = "Recent conversations",
+      this.startNewConversationText = "Start new conversation",
+      this.noConversationsText = "No conversations found",
+      this.conversationStatusOpen = "Open",
+      this.conversationStatusResolved = "Resolved",
+      this.backButtonTooltip = "Back"
     })
       : super(
             attachmentButtonAccessibilityLabel:
