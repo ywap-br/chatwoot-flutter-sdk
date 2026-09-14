@@ -33,8 +33,8 @@ class ChatwootRecentConversations extends StatelessWidget {
   final DateFormat? dateFormat;
 
   /// Optional custom builder for list items
-  final Widget Function(BuildContext context, ChatwootConversation conversation)?
-      itemBuilder;
+  final Widget Function(
+      BuildContext context, ChatwootConversation conversation)? itemBuilder;
 
   /// Optional custom header
   final Widget? header;
@@ -107,10 +107,24 @@ class ChatwootRecentConversations extends StatelessWidget {
     return "...";
   }
 
-  Widget _buildStatusChip(String? status) {
-    final isOpen = status == null || status.toLowerCase() == "open";
-    final label = isOpen ? l10n.conversationStatusOpen : l10n.conversationStatusResolved;
-    final color = isOpen ? Colors.green : Colors.grey;
+  /// Semantic (not thematic) label + color for a conversation's status --
+  /// this is meaning, not brand identity, so unlike the header's ticket
+  /// badge these four colors are fixed rather than derived from [theme].
+  (String, Color) _statusLabelAndColor(ChatwootConversationStatus status) {
+    switch (status) {
+      case ChatwootConversationStatus.resolved:
+        return (l10n.conversationStatusResolved, Colors.grey);
+      case ChatwootConversationStatus.pending:
+        return (l10n.conversationStatusPending, Colors.orange);
+      case ChatwootConversationStatus.snoozed:
+        return (l10n.conversationStatusSnoozed, Colors.blueGrey);
+      case ChatwootConversationStatus.open:
+        return (l10n.conversationStatusOpen, Colors.green);
+    }
+  }
+
+  Widget _buildStatusChip(ChatwootConversationStatus status) {
+    final (label, color) = _statusLabelAndColor(status);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -130,16 +144,36 @@ class ChatwootRecentConversations extends StatelessWidget {
     );
   }
 
+  /// Formats [ChatwootConversation.snoozedUntil] into
+  /// [ChatwootL10n.snoozedUntilLabel], or null if it's missing or fails to
+  /// parse -- same tolerant-of-bad-data fallback as everywhere else this
+  /// timestamp is used.
+  String? _formatSnoozedUntil(String? snoozedUntil) {
+    if (snoozedUntil == null) {
+      return null;
+    }
+    final date = DateTime.tryParse(snoozedUntil);
+    if (date == null) {
+      return null;
+    }
+    final formatted =
+        (timeFormat ?? DateFormat('dd/MM HH:mm')).format(date.toLocal());
+    return l10n.snoozedUntilLabel.replaceAll('{date}', formatted);
+  }
+
   Widget _buildConversationTile(
       BuildContext context, ChatwootConversation conversation) {
     if (itemBuilder != null) {
       return itemBuilder!(context, conversation);
     }
 
-    final isOpen = conversation.status == null ||
-        conversation.status!.toLowerCase() == "open";
+    final status = conversation.statusEnum;
+    final (_, statusColor) = _statusLabelAndColor(status);
     final lastMessage = _getLastMessagePreview(conversation);
     final timeString = _formatTimestamp(conversation);
+    final snoozedCaption = status == ChatwootConversationStatus.snoozed
+        ? _formatSnoozedUntil(conversation.snoozedUntil)
+        : null;
 
     return InkWell(
       onTap: () => onConversationSelected(conversation),
@@ -161,27 +195,26 @@ class ChatwootRecentConversations extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 22,
-                  backgroundColor: theme.primaryColor.withValues(alpha: 0.15),
+                  backgroundColor: theme.headerColor.withValues(alpha: 0.15),
                   child: Icon(
                     Icons.chat_bubble_outline,
-                    color: theme.primaryColor,
+                    color: theme.headerColor,
                     size: 22,
                   ),
                 ),
-                if (isOpen)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 11,
-                      height: 11,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 11,
+                    height: 11,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
                     ),
                   ),
+                ),
               ],
             ),
             const SizedBox(width: 12),
@@ -193,7 +226,8 @@ class ChatwootRecentConversations extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        "Conversa #${conversation.id}",
+                        l10n.ticketBadgeLabel
+                            .replaceAll('{id}', '${conversation.id}'),
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
@@ -226,9 +260,21 @@ class ChatwootRecentConversations extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _buildStatusChip(conversation.status),
+                      _buildStatusChip(status),
                     ],
                   ),
+                  if (snoozedCaption != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      snoozedCaption,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.blueGrey.shade400,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -272,8 +318,8 @@ class ChatwootRecentConversations extends StatelessWidget {
               icon: const Icon(Icons.add, size: 18),
               label: Text(l10n.startNewConversationText),
               style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primaryColor,
-                foregroundColor: Colors.white,
+                backgroundColor: theme.headerColor,
+                foregroundColor: theme.headerForegroundColor,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -296,8 +342,8 @@ class ChatwootRecentConversations extends StatelessWidget {
         icon: const Icon(Icons.add_comment_outlined, size: 18),
         label: Text(l10n.startNewConversationText),
         style: ElevatedButton.styleFrom(
-          backgroundColor: theme.primaryColor,
-          foregroundColor: Colors.white,
+          backgroundColor: theme.headerColor,
+          foregroundColor: theme.headerForegroundColor,
           minimumSize: const Size(double.infinity, 46),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -315,7 +361,7 @@ class ChatwootRecentConversations extends StatelessWidget {
         color: theme.backgroundColor,
         child: Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
+            valueColor: AlwaysStoppedAnimation<Color>(theme.headerColor),
           ),
         ),
       );
@@ -338,7 +384,7 @@ class ChatwootRecentConversations extends StatelessWidget {
     if (onRefresh != null) {
       content = RefreshIndicator(
         onRefresh: onRefresh!,
-        color: theme.primaryColor,
+        color: theme.headerColor,
         child: content,
       );
     }

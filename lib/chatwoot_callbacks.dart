@@ -74,6 +74,16 @@ class ChatwootCallbacks {
   ///Triggered when an agent resolves the current conversation
   void Function()? onConversationResolved;
 
+  ///Triggered when the active conversation's status changes to any value
+  ///(open, pending, resolved or snoozed) via a `conversation.status_changed`
+  ///websocket event. [snoozedUntil] is only non-null when [status] is
+  ///[ChatwootConversationStatus.snoozed]. Unlike [onConversationResolved],
+  ///which only fires for "resolved" (kept for backwards compatibility),
+  ///this fires for every status transition and is how the UI keeps the
+  ///ticket badge and the resolved banner in sync with the real status.
+  void Function(int conversationId, ChatwootConversationStatus status,
+      String? snoozedUntil)? onConversationStatusChanged;
+
   /// Triggered when any error occurs in chatwoot client's operations with the error
   ///
   /// See [ChatwootClientExceptionType] for the various types of exceptions that can be triggered
@@ -97,6 +107,7 @@ class ChatwootCallbacks {
     this.onConversationIsOnline,
     this.onConversationIsOffline,
     this.onConversationResolved,
+    this.onConversationStatusChanged,
     this.onError,
   });
 }

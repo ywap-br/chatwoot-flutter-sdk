@@ -263,7 +263,8 @@ void main() {
       //THEN
       verify(mockChatwootClientService.getConversations());
       verify(mockConversationDao.saveConversations(testConversations));
-      verify(mockChatwootCallbacks.onConversationsRetrieved?.call(testConversations));
+      verify(mockChatwootCallbacks.onConversationsRetrieved
+          ?.call(testConversations));
       expect(result, testConversations);
     });
 
@@ -286,7 +287,8 @@ void main() {
       //THEN
       verify(mockChatwootClientService.createConversation());
       verify(mockConversationDao.saveConversation(testConversation));
-      verify(mockChatwootCallbacks.onConversationCreated?.call(testConversation));
+      verify(
+          mockChatwootCallbacks.onConversationCreated?.call(testConversation));
       expect(result, testConversation);
     });
 
@@ -315,15 +317,18 @@ void main() {
         () {
       //GIVEN
       final testConversations = [testConversation];
-      when(mockConversationDao.getConversations()).thenReturn(testConversations);
-      when(mockChatwootCallbacks.onPersistedConversationsRetrieved).thenReturn((_) {});
+      when(mockConversationDao.getConversations())
+          .thenReturn(testConversations);
+      when(mockChatwootCallbacks.onPersistedConversationsRetrieved)
+          .thenReturn((_) {});
 
       //WHEN
       final result = repo.getPersistedConversations();
 
       //THEN
       expect(result, testConversations);
-      verify(mockChatwootCallbacks.onPersistedConversationsRetrieved?.call(testConversations));
+      verify(mockChatwootCallbacks.onPersistedConversationsRetrieved
+          ?.call(testConversations));
     });
 
     test(
@@ -472,6 +477,8 @@ void main() {
       when(mockLocalStorage.dispose()).thenAnswer((_) => (_) {});
       when(mockChatwootCallbacks.onConversationResolved)
           .thenAnswer((_) => () {});
+      when(mockChatwootCallbacks.onConversationStatusChanged)
+          .thenAnswer((_) => (conversationId, status, snoozedUntil) {});
       final dynamic resolvedEvent = await TestResourceUtil.readJsonResource(
           fileName: "websocket_conversation_status_changed");
       repo.listenForEvents();
@@ -482,6 +489,8 @@ void main() {
 
       //THEN
       verify(mockChatwootCallbacks.onConversationResolved?.call());
+      verify(mockChatwootCallbacks.onConversationStatusChanged?.call(
+          testConversation.id, ChatwootConversationStatus.resolved, null));
     });
 
     test(

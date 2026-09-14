@@ -116,7 +116,8 @@ class ChatwootRepositoryImpl extends ChatwootRepository {
         final refreshedConversation = conversations.firstWhere(
             (element) => element.id == persistedConversation.id,
             orElse: () => persistedConversation);
-        await localStorage.conversationDao.saveConversation(refreshedConversation);
+        await localStorage.conversationDao
+            .saveConversation(refreshedConversation);
       } else if (conversations.isNotEmpty) {
         await localStorage.conversationDao.saveConversation(conversations.last);
       }
@@ -158,7 +159,8 @@ class ChatwootRepositoryImpl extends ChatwootRepository {
       final conversation = await clientService.createConversation();
       await localStorage.conversationDao.saveConversation(conversation);
       final current = localStorage.conversationDao.getConversations();
-      await localStorage.conversationDao.saveConversations([...current, conversation]);
+      await localStorage.conversationDao
+          .saveConversations([...current, conversation]);
       callbacks.onConversationCreated?.call(conversation);
       return conversation;
     } on ChatwootClientException catch (e) {
@@ -245,14 +247,34 @@ class ChatwootRepositoryImpl extends ChatwootRepository {
           ChatwootEventMessageType.conversation_typing_on) {
         callbacks.onConversationStartedTyping?.call();
       } else if (chatwootEvent.message?.event ==
-              ChatwootEventMessageType.conversation_status_changed &&
-          chatwootEvent.message?.data?.status == "resolved" &&
-          chatwootEvent.message?.data?.id ==
-              (localStorage.conversationDao.getConversation()?.id ?? 0)) {
-        //delete conversation result
-        localStorage.conversationDao.deleteConversation();
-        localStorage.messagesDao.clear();
-        callbacks.onConversationResolved?.call();
+          ChatwootEventMessageType.conversation_status_changed) {
+        // Update the persisted active conversation's status in place (no
+        // more wiping its messages, which used to make the "resolved"
+        // notice pointless -- the conversation and its history need to
+        // stay readable so the UI can show a status banner over them).
+        // See [ChatwootCallbacks.onConversationStatusChanged].
+        final data = chatwootEvent.message?.data;
+        final activeConversation =
+            localStorage.conversationDao.getConversation();
+        final newStatus = data?.status;
+        if (activeConversation != null &&
+            data?.id == activeConversation.id &&
+            newStatus != null) {
+          final updatedConversation = activeConversation.withStatus(
+            newStatus,
+            snoozedUntil: data?.snoozedUntil,
+          );
+          localStorage.conversationDao.saveConversation(updatedConversation);
+          callbacks.onConversationStatusChanged?.call(
+            updatedConversation.id,
+            updatedConversation.statusEnum,
+            updatedConversation.snoozedUntil,
+          );
+          if (updatedConversation.statusEnum ==
+              ChatwootConversationStatus.resolved) {
+            callbacks.onConversationResolved?.call();
+          }
+        }
       } else if (chatwootEvent.message?.event ==
           ChatwootEventMessageType.presence_update) {
         final presenceStatuses =

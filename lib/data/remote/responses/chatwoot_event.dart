@@ -103,6 +103,11 @@ class ChatwootEventMessageData {
   @JsonKey()
   final String? status;
 
+  /// Present on `conversation.status_changed` events when [status] is
+  /// "snoozed": the ISO-8601 timestamp the conversation is snoozed until.
+  @JsonKey(name: "snoozed_until")
+  final String? snoozedUntil;
+
   @JsonKey(name: "updated_at")
   final dynamic updatedAt;
 
@@ -131,6 +136,7 @@ class ChatwootEventMessageData {
       this.sourceId,
       this.updatedAt,
       this.status,
+      this.snoozedUntil,
       this.accountId,
       this.externalSourceIds,
       this.private,

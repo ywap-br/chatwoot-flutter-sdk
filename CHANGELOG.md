@@ -38,3 +38,15 @@
 
 - Fixed message sending issues
 - Adds development docs
+
+## [0.0.10]
+
+- Restyled `ChatwootChat` for a full-bleed, WhatsApp-inspired look: edge-to-edge chat page (no wasted side padding outside dialogs), `SafeArea` handling, and a header that shows the agent's real name/avatar (derived from message senders) plus an online/busy/offline/typing status subtitle.
+- Added `ChatwootChatTheme.headerColor`, `headerForegroundColor` and `headerSubtitleTextStyle` so the chat page header no longer reuses `primaryColor`/white implicitly. Apps that previously relied on `primaryColor` alone to theme the app bar should now also set `headerColor`/`headerForegroundColor` (or, when using `ChatwootChatDialog.show()`, its new `headerColor`/`headerForegroundColor` parameters, which default to `primaryColor` to match the old look).
+- Changed default theme palette to a WhatsApp-style look: light green sent bubbles, teal header, beige chat background. Override via `ChatwootChatTheme` to keep the previous blue branding.
+- Fixed `onConversationIsOnline`/`onConversationIsOffline` callbacks not being wired up inside `ChatwootChat` (they were previously never triggered by the plain widget, only by `ChatwootChatDialog`).
+- Fixed `onConversationStartedTyping`/`onConversationStoppedTyping` callbacks being swapped inside `ChatwootChat`.
+- `ChatwootChatDialog.show()` now opens as a full-screen route (`Navigator.push` with `fullscreenDialog: true`) instead of a small floating `Dialog`. It no longer dismisses on tapping outside; use the chat's back button or `Navigator.pop`.
+- `ChatwootChat.showUserNames` now defaults to `false` (was `true`): like a WhatsApp 1:1 conversation, the agent's name is already shown once in the header, so it's no longer repeated on every message. Pass `showUserNames: true` to restore the old behavior.
+- Added `ChatwootChat.presenceStatus` (`ChatwootPresenceStatus.online`/`busy`/`offline`) to let host apps override the header status text with their own richer agent-availability signal; the SDK only ever derives `online`/`offline` on its own.
+- Added `ChatwootChatTheme.backgroundImageSource` for a chat wallpaper image (local file path or `http(s)://` URL), resolved via the new `chatwootBackgroundImageProvider`. A missing local file or failed network load falls back to the flat `backgroundColor`.

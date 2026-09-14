@@ -13,6 +13,18 @@ import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
+/// Presence status shown in the chat header subtitle.
+///
+/// [ChatwootChat] derives [online]/[offline] on its own from the real-time
+/// presence events the SDK already receives. [busy] has no equivalent
+/// signal in the SDK today, so it is only ever shown when the host app
+/// supplies it explicitly via [ChatwootChat.presenceStatus].
+enum ChatwootPresenceStatus { online, busy, offline }
+
+/// Metadata key marking a locally-synthesized message (e.g. the "resolved"
+/// notice) so it never gets mistaken for a real agent identity.
+const _kIsSystemMessageKey = 'chatwootIsSystemMessage';
+
 ///Chatwoot chat widget
 /// {@category FlutterClientSdk}
 class ChatwootChat extends StatefulWidget {
@@ -55,10 +67,20 @@ class ChatwootChat extends StatefulWidget {
   /// Show avatars for received messages.
   final bool showUserAvatars;
 
-  /// Show user names for received messages.
+  /// Show user names for received messages. Defaults to false: like a
+  /// WhatsApp 1:1 conversation, the agent's identity is already shown once
+  /// in the page header, so repeating it on every message is redundant.
   final bool showUserNames;
 
   final ChatwootChatTheme? theme;
+
+  /// Overrides the online/busy/offline status shown under the header title.
+  ///
+  /// When null (the default), [ChatwootChat] shows the real online/offline
+  /// state it receives from the Chatwoot websocket presence events. Set
+  /// this when your app has its own richer agent-availability signal (for
+  /// example a "busy" status the SDK cannot derive on its own).
+  final ChatwootPresenceStatus? presenceStatus;
 
   /// See [ChatwootL10n]
   final ChatwootL10n l10n;
@@ -136,8 +158,9 @@ class ChatwootChat extends StatefulWidget {
       this.onMessageTap,
       this.onSendPressed,
       this.showUserAvatars = true,
-      this.showUserNames = true,
+      this.showUserNames = false,
       this.theme,
+      this.presenceStatus,
       this.l10n = const ChatwootL10n(),
       this.timeFormat,
       this.dateFormat,
@@ -169,9 +192,21 @@ class _ChatwootChatState extends State<ChatwootChat> {
   ///
   List<types.Message> _messages = [];
   List<ChatwootConversation> _conversations = [];
-  ChatwootConversation? _activeConversation;
   late bool _showingChat;
   bool _isLoadingConversations = true;
+
+  /// The conversation currently shown in the chat screen (as opposed to
+  /// the recent-conversations list). Drives the header's ticket badge and
+  /// the resolved banner -- both need the live status/id of whatever the
+  /// user is actually looking at, not just the raw message list.
+  ChatwootConversation? _activeConversation;
+
+  /// Whether the active conversation is currently online, offline, or
+  /// unknown (null) because no status update has been received yet.
+  bool? _isOnline;
+
+  /// Whether the agent is currently typing a reply.
+  bool _isTyping = false;
 
   late String status;
 
@@ -207,10 +242,36 @@ class _ChatwootChatState extends State<ChatwootChat> {
         widget.onConfirmedSubscription?.call();
       },
       onConversationStartedTyping: () {
-        widget.onConversationStoppedTyping?.call();
+        if (mounted) {
+          setState(() {
+            _isTyping = true;
+          });
+        }
+        widget.onConversationStartedTyping?.call();
       },
       onConversationStoppedTyping: () {
-        widget.onConversationStartedTyping?.call();
+        if (mounted) {
+          setState(() {
+            _isTyping = false;
+          });
+        }
+        widget.onConversationStoppedTyping?.call();
+      },
+      onConversationIsOnline: () {
+        if (mounted) {
+          setState(() {
+            _isOnline = true;
+          });
+        }
+        widget.onConversationIsOnline?.call();
+      },
+      onConversationIsOffline: () {
+        if (mounted) {
+          setState(() {
+            _isOnline = false;
+          });
+        }
+        widget.onConversationIsOffline?.call();
       },
       onPersistedMessagesRetrieved: (persistedMessages) {
         if (widget.enablePersistence) {
@@ -268,6 +329,7 @@ class _ChatwootChatState extends State<ChatwootChat> {
           setState(() {
             _conversations = conversations;
             _isLoadingConversations = false;
+            _refreshActiveConversationFrom(conversations);
           });
         }
         widget.onConversationsRetrieved?.call(conversations);
@@ -277,6 +339,7 @@ class _ChatwootChatState extends State<ChatwootChat> {
           setState(() {
             _conversations = conversations;
             _isLoadingConversations = false;
+            _refreshActiveConversationFrom(conversations);
           });
         }
       },
@@ -284,30 +347,42 @@ class _ChatwootChatState extends State<ChatwootChat> {
         if (mounted) {
           setState(() {
             _activeConversation = conversation;
-            _messages = [];
+            // Hardcoded system notice confirming the new ticket, same
+            // pattern as the resolved-status banner: filtered out of
+            // [_agent] via [_kIsSystemMessageKey] so it's never mistaken
+            // for a real agent message.
+            _messages = [
+              types.TextMessage(
+                id: idGen.v4(),
+                text: widget.l10n.ticketOpenedMessage
+                    .replaceAll('{id}', '${conversation.id}'),
+                author: types.User(id: idGen.v4(), firstName: "Sistema"),
+                status: types.Status.delivered,
+                metadata: const {_kIsSystemMessageKey: true},
+              ),
+            ];
             _showingChat = true;
             _isLoadingConversations = false;
           });
         }
         widget.onConversationCreated?.call(conversation);
       },
-      onConversationResolved: () {
-        final resolvedMessage = types.TextMessage(
-            id: idGen.v4(),
-            text: widget.l10n.conversationResolvedMessage,
-            author: types.User(
-                id: idGen.v4(),
-                firstName: "Bot",
-                imageUrl:
-                    "https://d2cbg94ubxgsnp.cloudfront.net/Pictures/480x270//9/9/3/512993_shutterstock_715962319converted_920340.png"),
-            status: types.Status.delivered);
-        _addMessage(resolvedMessage);
+      onConversationStatusChanged: (conversationId, status, snoozedUntil) {
+        if (mounted && _activeConversation?.id == conversationId) {
+          setState(() {
+            _activeConversation = _activeConversation!.withStatus(
+              status.name,
+              snoozedUntil: snoozedUntil,
+            );
+          });
+        }
       },
       onError: (error) {
         if (error.type == ChatwootClientExceptionType.SEND_MESSAGE_FAILED) {
           _handleSendMessageFailed(error.data);
         }
-        print("Ooops! Something went wrong. [${error.type}] Error Cause: ${error.cause}");
+        print(
+            "Ooops! Something went wrong. [${error.type}] Error Cause: ${error.cause}");
         widget.onError?.call(error);
       },
     );
@@ -322,11 +397,15 @@ class _ChatwootChatState extends State<ChatwootChat> {
       if (mounted) {
         setState(() {
           chatwootClient = client;
-          _activeConversation = client.getActiveConversation();
           _conversations = client.getPersistedConversations();
           if (_conversations.isNotEmpty) {
             _isLoadingConversations = false;
           }
+          // Restores the ticket badge/resolved banner for a returning
+          // session (persistence on, `showConversationHistory: false`)
+          // where the chat opens straight into an existing conversation
+          // without going through [_handleSelectConversation].
+          _activeConversation = client.getActiveConversation();
           client.loadMessages();
           client.loadConversations();
         });
@@ -450,8 +529,8 @@ class _ChatwootChatState extends State<ChatwootChat> {
 
   void _handleSelectConversation(ChatwootConversation conversation) {
     setState(() {
-      _activeConversation = conversation;
       _showingChat = true;
+      _activeConversation = conversation;
       _messages = conversation.messages
           .map((message) => _chatwootMessageToTextMessage(message))
           .toList();
@@ -468,15 +547,11 @@ class _ChatwootChatState extends State<ChatwootChat> {
       setState(() {
         _isLoadingConversations = true;
       });
-      final conversation = await chatwootClient?.createConversation();
-      if (conversation != null && mounted) {
-        setState(() {
-          _activeConversation = conversation;
-          _messages = [];
-          _showingChat = true;
-          _isLoadingConversations = false;
-        });
-      }
+      // `onConversationCreated` (wired in initState) is what actually sets
+      // _messages/_activeConversation/_showingChat once the conversation
+      // comes back -- including the "Ticket #{id} aberto" notice. Setting
+      // them again here would race it and wipe that notice back out.
+      await chatwootClient?.createConversation();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -493,82 +568,327 @@ class _ChatwootChatState extends State<ChatwootChat> {
     chatwootClient?.loadConversations();
   }
 
+  /// The agent shown in the header avatar: whoever sent the most recent
+  /// message that isn't from [_user]. The header *title* is always the
+  /// fixed [ChatwootChat.l10n].defaultChatTitle, never the agent's name.
+  types.User? get _agent {
+    for (final message in _messages) {
+      if (message.metadata?[_kIsSystemMessageKey] == true) {
+        continue;
+      }
+      if (message.author.id != _user.id) {
+        return message.author;
+      }
+    }
+    return null;
+  }
+
+  /// Keeps [_activeConversation] in sync whenever a fresh conversations
+  /// list comes in from the server or from disk -- catches status changes
+  /// (resolved/pending/snoozed) that arrived via a REST refresh instead of
+  /// the websocket's `conversation_status_changed` event, so the ticket
+  /// badge and resolved banner never show stale data.
+  void _refreshActiveConversationFrom(
+      List<ChatwootConversation> conversations) {
+    final active = _activeConversation;
+    if (active == null) {
+      return;
+    }
+    for (final conversation in conversations) {
+      if (conversation.id == active.id) {
+        _activeConversation = conversation;
+        return;
+      }
+    }
+  }
+
+  /// Formats [_activeConversation]'s `snoozed_until` into
+  /// [ChatwootL10n.snoozedUntilLabel], or null if [snoozedUntil] is
+  /// missing or fails to parse -- callers fall back to the plain
+  /// [ChatwootL10n.conversationStatusSnoozed] label in that case, same
+  /// tolerant-of-bad-data spirit as [chatwootImageProvider].
+  String? _formatSnoozedUntil(String? snoozedUntil) {
+    if (snoozedUntil == null) {
+      return null;
+    }
+    final date = DateTime.tryParse(snoozedUntil);
+    if (date == null) {
+      return null;
+    }
+    final formatted = DateFormat('dd/MM HH:mm').format(date.toLocal());
+    return widget.l10n.snoozedUntilLabel.replaceAll('{date}', formatted);
+  }
+
+  /// Ticket number badge for the top-right of the chat header. Colors are
+  /// derived from [ChatwootChatTheme.headerForegroundColor] -- the same
+  /// color the host app already picked to read well on
+  /// [ChatwootChatTheme.headerColor] -- rather than a fixed color, so it
+  /// always has adequate contrast no matter which theme/tenant brand is
+  /// active.
+  Widget _buildTicketBadge(ChatwootChatTheme theme) {
+    final conversation = _activeConversation!;
+    final label =
+        widget.l10n.ticketBadgeLabel.replaceAll('{id}', '${conversation.id}');
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: Container(
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: theme.headerForegroundColor.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: theme.headerForegroundColor.withValues(alpha: 0.4),
+            width: 0.8,
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: theme.headerForegroundColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Sticky banner shown right above the message list whenever
+  /// [_activeConversation] is resolved. Colors are derived from
+  /// [ChatwootChatTheme.headerColor] for the same theme-safe-contrast
+  /// reason as [_buildTicketBadge]. Returns null (renders nothing) for
+  /// every other status, including when there's no active conversation
+  /// yet -- callers gate on that null instead of checking status again.
+  Widget? _buildResolvedBanner(ChatwootChatTheme theme) {
+    if (_activeConversation?.statusEnum !=
+        ChatwootConversationStatus.resolved) {
+      return null;
+    }
+    return Container(
+      width: double.infinity,
+      color: theme.headerColor.withValues(alpha: 0.08),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle_outline, size: 18, color: theme.headerColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              widget.l10n.conversationResolvedMessage,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: theme.headerColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Replaces `flutter_chat_ui`'s default [UserAvatar] -- which only ever
+  /// shows the message's own author (i.e. each individual agent's photo)
+  /// and only supports network images -- with one fixed picture for every
+  /// received message, resolved from [ChatwootChatTheme.avatarImageSource]
+  /// (URL, absolute path or bundled asset). Sizing/margin mirrors
+  /// `UserAvatar` so swapping it in doesn't shift the message layout.
+  Widget _buildFixedAvatar(ChatwootChatTheme theme, ImageProvider avatar) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      child: CircleAvatar(
+        radius: 16,
+        backgroundColor: theme.userAvatarImageBackgroundColor,
+        backgroundImage: avatar,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final horizontalPadding = widget.isPresentedInDialog ? 8.0 : 16.0;
+    final theme = widget.theme ?? const ChatwootChatTheme();
+    // Full-bleed by default so the chat wallpaper reaches the screen edges,
+    // like a native WhatsApp conversation. A small inset is kept only when
+    // the widget is hosted inside a floating dialog.
+    final horizontalPadding = widget.isPresentedInDialog ? 8.0 : 0.0;
 
     if (!_showingChat && widget.showConversationHistory) {
       return Scaffold(
         appBar: widget.appBar ??
             AppBar(
               title: Text(widget.l10n.recentConversationsTitle),
-              backgroundColor:
-                  widget.theme?.primaryColor ?? CHATWOOT_COLOR_PRIMARY,
-              foregroundColor: Colors.white,
+              backgroundColor: theme.headerColor,
+              foregroundColor: theme.headerForegroundColor,
               elevation: 0,
             ),
-        backgroundColor: widget.theme?.backgroundColor,
-        body: ChatwootRecentConversations(
-          conversations: _conversations,
-          onConversationSelected: _handleSelectConversation,
-          onNewConversation: _handleNewConversation,
-          onRefresh: () async {
-            await chatwootClient?.loadConversations();
-          },
-          theme: widget.theme ?? const ChatwootChatTheme(),
-          l10n: widget.l10n,
-          dateFormat: widget.dateFormat,
-          timeFormat: widget.timeFormat,
-          isLoading: _isLoadingConversations && _conversations.isEmpty,
+        backgroundColor: theme.backgroundColor,
+        body: SafeArea(
+          child: ChatwootRecentConversations(
+            conversations: _conversations,
+            onConversationSelected: _handleSelectConversation,
+            onNewConversation: _handleNewConversation,
+            onRefresh: () async {
+              await chatwootClient?.loadConversations();
+            },
+            theme: theme,
+            l10n: widget.l10n,
+            dateFormat: widget.dateFormat,
+            timeFormat: widget.timeFormat,
+            isLoading: _isLoadingConversations && _conversations.isEmpty,
+          ),
         ),
       );
     }
 
     PreferredSizeWidget? chatAppBar = widget.appBar;
-    if (chatAppBar == null && widget.showConversationHistory) {
+    if (chatAppBar == null) {
+      final agent = _agent;
+      final fixedAvatar = chatwootImageProvider(theme.avatarImageSource);
+      final conversationStatus = _activeConversation?.statusEnum;
+      final effectivePresence = widget.presenceStatus ??
+          (_isOnline == null
+              ? null
+              : (_isOnline!
+                  ? ChatwootPresenceStatus.online
+                  : ChatwootPresenceStatus.offline));
+      // Resolved already gets its own banner below the header, so it's
+      // left out here to avoid saying the same thing twice; pending and
+      // snoozed have no banner of their own, so they take over the
+      // presence subtitle instead.
+      final statusText = _isTyping
+          ? widget.l10n.isTyping
+          : conversationStatus == ChatwootConversationStatus.pending
+              ? widget.l10n.conversationStatusPending
+              : conversationStatus == ChatwootConversationStatus.snoozed
+                  ? (_formatSnoozedUntil(_activeConversation?.snoozedUntil) ??
+                      widget.l10n.conversationStatusSnoozed)
+                  : switch (effectivePresence) {
+                      ChatwootPresenceStatus.online => widget.l10n.onlineText,
+                      ChatwootPresenceStatus.busy => widget.l10n.busyText,
+                      ChatwootPresenceStatus.offline => widget.l10n.offlineText,
+                      null => null,
+                    };
       chatAppBar = AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          tooltip: widget.l10n.backButtonTooltip,
-          onPressed: _handleBackToConversations,
+        leading: widget.showConversationHistory
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: widget.l10n.backButtonTooltip,
+                onPressed: _handleBackToConversations,
+              )
+            : null,
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor:
+                  theme.headerForegroundColor.withValues(alpha: 0.16),
+              backgroundImage: fixedAvatar ??
+                  (agent?.imageUrl != null
+                      ? NetworkImage(agent!.imageUrl!)
+                      : null),
+              child: fixedAvatar == null && agent?.imageUrl == null
+                  ? Icon(
+                      Icons.chat_bubble_outline,
+                      color: theme.headerForegroundColor,
+                      size: 18,
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.l10n.defaultChatTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (statusText != null)
+                    Text(
+                      statusText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.headerSubtitleTextStyle,
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
-        title: Text(_activeConversation != null
-            ? "Conversa #${_activeConversation!.id}"
-            : widget.l10n.recentConversationsTitle),
-        backgroundColor: widget.theme?.primaryColor ?? CHATWOOT_COLOR_PRIMARY,
-        foregroundColor: Colors.white,
+        actions: [
+          if (_activeConversation != null) _buildTicketBadge(theme),
+        ],
+        backgroundColor: theme.headerColor,
+        foregroundColor: theme.headerForegroundColor,
         elevation: 0,
       );
     }
 
+    final wallpaper = chatwootImageProvider(theme.backgroundImageSource);
+    // The inner Chat widget always paints an opaque theme.backgroundColor
+    // fill of its own, so the wallpaper is drawn one level up here and the
+    // Chat's own fill is made transparent to let it show through.
+    final chatTheme = wallpaper == null
+        ? theme
+        : theme.copyWith(backgroundColor: Colors.transparent);
+    final resolvedBanner = _buildResolvedBanner(theme);
+    final fixedAvatarProvider = chatwootImageProvider(theme.avatarImageSource);
+
     return Scaffold(
       appBar: chatAppBar,
-      backgroundColor: widget.theme?.backgroundColor,
-      body: Column(
-        children: [
-          Flexible(
-            child: Padding(
-              padding: EdgeInsets.only(
-                  left: horizontalPadding, right: horizontalPadding),
-              child: Chat(
-                messages: _messages,
-                onMessageTap: _handleMessageTap,
-                onPreviewDataFetched: _handlePreviewDataFetched,
-                onSendPressed: _handleSendPressed,
-                user: _user,
-                onEndReached: widget.onEndReached,
-                onEndReachedThreshold: widget.onEndReachedThreshold,
-                onMessageLongPress: widget.onMessageLongPress,
-                showUserAvatars: widget.showUserAvatars,
-                showUserNames: widget.showUserNames,
-                timeFormat: widget.timeFormat ?? DateFormat.Hm(),
-                dateFormat: widget.dateFormat ?? DateFormat("EEEE MMMM d"),
-                theme: widget.theme ?? ChatwootChatTheme(),
-                l10n: widget.l10n,
+      backgroundColor: theme.backgroundColor,
+      body: Container(
+        decoration: wallpaper == null
+            ? null
+            : BoxDecoration(
+                image: DecorationImage(
+                  image: wallpaper,
+                  fit: BoxFit.cover,
+                  onError: (exception, stackTrace) {
+                    debugPrint(
+                        "Chatwoot: failed to load chat background image: $exception");
+                  },
+                ),
               ),
-            ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              if (resolvedBanner != null) resolvedBanner,
+              Flexible(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                      left: horizontalPadding, right: horizontalPadding),
+                  child: Chat(
+                    messages: _messages,
+                    onMessageTap: _handleMessageTap,
+                    onPreviewDataFetched: _handlePreviewDataFetched,
+                    onSendPressed: _handleSendPressed,
+                    user: _user,
+                    onEndReached: widget.onEndReached,
+                    onEndReachedThreshold: widget.onEndReachedThreshold,
+                    onMessageLongPress: widget.onMessageLongPress,
+                    showUserAvatars: widget.showUserAvatars,
+                    showUserNames: widget.showUserNames,
+                    avatarBuilder: fixedAvatarProvider == null
+                        ? null
+                        : (author) =>
+                            _buildFixedAvatar(theme, fixedAvatarProvider),
+                    timeFormat: widget.timeFormat ?? DateFormat.Hm(),
+                    dateFormat: widget.dateFormat ?? DateFormat("EEEE MMMM d"),
+                    theme: chatTheme,
+                    l10n: widget.l10n,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

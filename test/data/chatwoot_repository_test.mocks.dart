@@ -617,6 +617,21 @@ class MockChatwootCallbacks extends _i1.Mock implements _i16.ChatwootCallbacks {
       );
 
   @override
+  set onConversationStatusChanged(
+          void Function(
+            int,
+            _i7.ChatwootConversationStatus,
+            String?,
+          )? _onConversationStatusChanged) =>
+      super.noSuchMethod(
+        Invocation.setter(
+          #onConversationStatusChanged,
+          _onConversationStatusChanged,
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
   set onError(void Function(_i17.ChatwootClientException)? _onError) =>
       super.noSuchMethod(
         Invocation.setter(

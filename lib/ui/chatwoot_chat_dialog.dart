@@ -2,7 +2,6 @@ import 'package:chatwoot_sdk/data/local/entity/chatwoot_user.dart';
 import 'package:chatwoot_sdk/ui/chatwoot_chat_theme.dart';
 import 'package:chatwoot_sdk/ui/chatwoot_l10n.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:intl/intl.dart';
 
 import 'chatwoot_chat_page.dart';
@@ -20,29 +19,38 @@ class ChatwootChatDialog extends StatefulWidget {
     Color? primaryColor,
     Color? secondaryColor,
     Color? backgroundColor,
+    Color? headerColor,
+    Color? headerForegroundColor,
+    String? backgroundImageSource,
+    String? avatarImageSource,
     ChatwootL10n? l10n,
     DateFormat? timeFormat,
     DateFormat? dateFormat,
     bool showConversationHistory = true,
   }) {
-    showDialog(
-        context: context,
-        builder: (context) {
-          return ChatwootChatDialog(
-            baseUrl: baseUrl,
-            inboxIdentifier: inboxIdentifier,
-            title: title,
-            user: user,
-            enablePersistence: enablePersistence,
-            primaryColor: primaryColor,
-            secondaryColor: secondaryColor,
-            backgroundColor: backgroundColor,
-            l10n: l10n,
-            timeFormat: timeFormat,
-            dateFormat: dateFormat,
-            showConversationHistory: showConversationHistory,
-          );
-        });
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (context) => ChatwootChatDialog(
+          baseUrl: baseUrl,
+          inboxIdentifier: inboxIdentifier,
+          title: title,
+          user: user,
+          enablePersistence: enablePersistence,
+          primaryColor: primaryColor,
+          secondaryColor: secondaryColor,
+          backgroundColor: backgroundColor,
+          headerColor: headerColor,
+          headerForegroundColor: headerForegroundColor,
+          backgroundImageSource: backgroundImageSource,
+          avatarImageSource: avatarImageSource,
+          l10n: l10n,
+          timeFormat: timeFormat,
+          dateFormat: dateFormat,
+          showConversationHistory: showConversationHistory,
+        ),
+      ),
+    );
   }
 
   ///Installation url for chatwoot
@@ -72,7 +80,27 @@ class ChatwootChatDialog extends StatefulWidget {
   /// Secondary color for [ChatwootChatTheme]
   final Color? backgroundColor;
 
-  /// See [ChatwootL10n]
+  /// Header (app bar) background for [ChatwootChatTheme]. Defaults to
+  /// [primaryColor] when unset, matching the color the header used before
+  /// [ChatwootChatTheme.headerColor] existed.
+  final Color? headerColor;
+
+  /// Header (app bar) title/icon color for [ChatwootChatTheme].
+  final Color? headerForegroundColor;
+
+  /// Chat wallpaper for [ChatwootChatTheme.backgroundImageSource]. See that
+  /// field for how a URL vs. an absolute vs. a relative (asset) path is
+  /// resolved, and for the trust assumptions on this value.
+  final String? backgroundImageSource;
+
+  /// Fixed avatar for [ChatwootChatTheme.avatarImageSource], shown in the
+  /// header and on every received message instead of each agent's own
+  /// photo/initials. See that field for how a URL vs. an absolute vs. a
+  /// relative (asset) path is resolved.
+  final String? avatarImageSource;
+
+  /// Fixed title shown in the chat header instead of the agent's real
+  /// name, and as the recent-conversations screen title.
   final String title;
 
   /// See [ChatwootL10n]
@@ -97,6 +125,10 @@ class ChatwootChatDialog extends StatefulWidget {
     this.primaryColor,
     this.secondaryColor,
     this.backgroundColor,
+    this.headerColor,
+    this.headerForegroundColor,
+    this.backgroundImageSource,
+    this.avatarImageSource,
     this.l10n,
     this.timeFormat,
     this.dateFormat,
@@ -108,128 +140,40 @@ class ChatwootChatDialog extends StatefulWidget {
 }
 
 class _ChatwootChatDialogState extends State<ChatwootChatDialog> {
-  late String status;
-  late ChatwootL10n localizedStrings;
-
-  @override
-  void initState() {
-    super.initState();
-    this.localizedStrings = widget.l10n ?? ChatwootL10n();
-    this.status = localizedStrings.offlineText;
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.white,
-      insetPadding: EdgeInsets.all(8.0),
-      child: Container(
-        width: double.infinity,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            widget.title,
-                            style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold),
-                          ),
-                          Visibility(
-                            visible: status != localizedStrings.offlineText,
-                            child: Container(
-                              width: 10,
-                              height: 10,
-                              margin: EdgeInsets.only(left: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.green,
-                                borderRadius: BorderRadius.circular(40),
-                              ),
-                            ),
-                          )
-                        ],
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2.0),
-                        child: Text(
-                          status,
-                          style: TextStyle(fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: InkWell(
-                    onTap: () => Navigator.pop(context),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Icon(
-                        Icons.close,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                )
-              ],
-            ),
-            Flexible(
-              child: ChatwootChat(
-                baseUrl: widget.baseUrl,
-                inboxIdentifier: widget.inboxIdentifier,
-                user: widget.user,
-                enablePersistence: widget.enablePersistence,
-                timeFormat: widget.timeFormat,
-                dateFormat: widget.dateFormat,
-                showConversationHistory: widget.showConversationHistory,
-                theme: ChatwootChatTheme(
-                    primaryColor: widget.primaryColor ?? CHATWOOT_COLOR_PRIMARY,
-                    secondaryColor: widget.secondaryColor ?? Colors.white,
-                    backgroundColor:
-                        widget.backgroundColor ?? CHATWOOT_BG_COLOR,
-                    userAvatarNameColors: [
-                      widget.primaryColor ?? CHATWOOT_COLOR_PRIMARY
-                    ]),
-                isPresentedInDialog: true,
-                onConversationIsOffline: () {
-                  setState(() {
-                    status = localizedStrings.offlineText;
-                  });
-                },
-                onConversationIsOnline: () {
-                  setState(() {
-                    status = localizedStrings.onlineText;
-                  });
-                },
-                onConversationStoppedTyping: () {
-                  setState(() {
-                    if (status == localizedStrings.typingText) {
-                      status = localizedStrings.onlineText;
-                    }
-                  });
-                },
-                onConversationStartedTyping: () {
-                  setState(() {
-                    status = localizedStrings.typingText;
-                  });
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
+    // ChatwootChat already renders a full page (header, wallpaper, input)
+    // on its own, so this wrapper just needs to hand it the dialog's
+    // color/l10n overrides and make sure `widget.title` always drives the
+    // chat header title: it is the fixed name shown there (never the real
+    // agent's name), and it also names the recent-conversations screen
+    // when the host does not supply its own l10n.
+    final baseL10n =
+        widget.l10n ?? ChatwootL10n(recentConversationsTitle: widget.title);
+    final l10n = baseL10n.copyWith(defaultChatTitle: widget.title);
+    return ChatwootChat(
+      baseUrl: widget.baseUrl,
+      inboxIdentifier: widget.inboxIdentifier,
+      user: widget.user,
+      enablePersistence: widget.enablePersistence,
+      timeFormat: widget.timeFormat,
+      dateFormat: widget.dateFormat,
+      showConversationHistory: widget.showConversationHistory,
+      l10n: l10n,
+      theme: ChatwootChatTheme(
+          primaryColor: widget.primaryColor ?? CHATWOOT_COLOR_PRIMARY,
+          secondaryColor: widget.secondaryColor ?? Colors.white,
+          backgroundColor: widget.backgroundColor ?? CHATWOOT_BG_COLOR,
+          headerColor: widget.headerColor ??
+              widget.primaryColor ??
+              CHATWOOT_HEADER_COLOR,
+          headerForegroundColor:
+              widget.headerForegroundColor ?? CHATWOOT_HEADER_FOREGROUND_COLOR,
+          backgroundImageSource: widget.backgroundImageSource,
+          avatarImageSource: widget.avatarImageSource,
+          userAvatarNameColors: [
+            widget.primaryColor ?? CHATWOOT_COLOR_PRIMARY
+          ]),
     );
   }
 }
