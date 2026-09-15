@@ -23,6 +23,17 @@ class ChatwootChatDialog extends StatefulWidget {
     Color? headerForegroundColor,
     String? backgroundImageSource,
     String? avatarImageSource,
+    bool showAgentIdentity = true,
+    Color? sentMessageTextColor,
+    Color? receivedMessageTextColor,
+    Color? inputBackgroundColor,
+    Color? inputTextColor,
+    Color? listTitleColor,
+    Color? listSubtitleColor,
+    Color? listTimestampColor,
+    Color? listDividerColor,
+    Color? listEmptyIconColor,
+    Color? listEmptyTextColor,
     ChatwootL10n? l10n,
     DateFormat? timeFormat,
     DateFormat? dateFormat,
@@ -44,6 +55,17 @@ class ChatwootChatDialog extends StatefulWidget {
           headerForegroundColor: headerForegroundColor,
           backgroundImageSource: backgroundImageSource,
           avatarImageSource: avatarImageSource,
+          showAgentIdentity: showAgentIdentity,
+          sentMessageTextColor: sentMessageTextColor,
+          receivedMessageTextColor: receivedMessageTextColor,
+          inputBackgroundColor: inputBackgroundColor,
+          inputTextColor: inputTextColor,
+          listTitleColor: listTitleColor,
+          listSubtitleColor: listSubtitleColor,
+          listTimestampColor: listTimestampColor,
+          listDividerColor: listDividerColor,
+          listEmptyIconColor: listEmptyIconColor,
+          listEmptyTextColor: listEmptyTextColor,
           l10n: l10n,
           timeFormat: timeFormat,
           dateFormat: dateFormat,
@@ -99,6 +121,39 @@ class ChatwootChatDialog extends StatefulWidget {
   /// relative (asset) path is resolved.
   final String? avatarImageSource;
 
+  /// See [ChatwootChat.showAgentIdentity].
+  final bool showAgentIdentity;
+
+  /// Text color override for sent message bubbles.
+  final Color? sentMessageTextColor;
+
+  /// Text color override for received message bubbles.
+  final Color? receivedMessageTextColor;
+
+  /// See [ChatwootChatTheme.inputBackgroundColor] (the text-input surface).
+  final Color? inputBackgroundColor;
+
+  /// See [ChatwootChatTheme.inputTextColor].
+  final Color? inputTextColor;
+
+  /// See [ChatwootChatTheme.listTitleColor].
+  final Color? listTitleColor;
+
+  /// See [ChatwootChatTheme.listSubtitleColor].
+  final Color? listSubtitleColor;
+
+  /// See [ChatwootChatTheme.listTimestampColor].
+  final Color? listTimestampColor;
+
+  /// See [ChatwootChatTheme.listDividerColor].
+  final Color? listDividerColor;
+
+  /// See [ChatwootChatTheme.listEmptyIconColor].
+  final Color? listEmptyIconColor;
+
+  /// See [ChatwootChatTheme.listEmptyTextColor].
+  final Color? listEmptyTextColor;
+
   /// Fixed title shown in the chat header instead of the agent's real
   /// name, and as the recent-conversations screen title.
   final String title;
@@ -129,6 +184,17 @@ class ChatwootChatDialog extends StatefulWidget {
     this.headerForegroundColor,
     this.backgroundImageSource,
     this.avatarImageSource,
+    this.showAgentIdentity = true,
+    this.sentMessageTextColor,
+    this.receivedMessageTextColor,
+    this.inputBackgroundColor,
+    this.inputTextColor,
+    this.listTitleColor,
+    this.listSubtitleColor,
+    this.listTimestampColor,
+    this.listDividerColor,
+    this.listEmptyIconColor,
+    this.listEmptyTextColor,
     this.l10n,
     this.timeFormat,
     this.dateFormat,
@@ -159,6 +225,7 @@ class _ChatwootChatDialogState extends State<ChatwootChatDialog> {
       timeFormat: widget.timeFormat,
       dateFormat: widget.dateFormat,
       showConversationHistory: widget.showConversationHistory,
+      showAgentIdentity: widget.showAgentIdentity,
       l10n: l10n,
       theme: ChatwootChatTheme(
           primaryColor: widget.primaryColor ?? CHATWOOT_COLOR_PRIMARY,
@@ -171,6 +238,27 @@ class _ChatwootChatDialogState extends State<ChatwootChatDialog> {
               widget.headerForegroundColor ?? CHATWOOT_HEADER_FOREGROUND_COLOR,
           backgroundImageSource: widget.backgroundImageSource,
           avatarImageSource: widget.avatarImageSource,
+          sentMessageBodyTextStyle: widget.sentMessageTextColor == null
+              ? CHATWOOT_SENT_MESSAGE_BODY_TEXT_STYLE
+              : CHATWOOT_SENT_MESSAGE_BODY_TEXT_STYLE.copyWith(
+                  color: widget.sentMessageTextColor),
+          receivedMessageBodyTextStyle: widget.receivedMessageTextColor == null
+              ? CHATWOOT_RECEIVED_MESSAGE_BODY_TEXT_STYLE
+              : CHATWOOT_RECEIVED_MESSAGE_BODY_TEXT_STYLE.copyWith(
+                  color: widget.receivedMessageTextColor),
+          inputBackgroundColor: widget.inputBackgroundColor ?? Colors.white,
+          inputTextColor: widget.inputTextColor ?? Colors.black87,
+          listTitleColor: widget.listTitleColor ?? CHATWOOT_LIST_TITLE_COLOR,
+          listSubtitleColor:
+              widget.listSubtitleColor ?? CHATWOOT_LIST_SUBTITLE_COLOR,
+          listTimestampColor:
+              widget.listTimestampColor ?? CHATWOOT_LIST_TIMESTAMP_COLOR,
+          listDividerColor:
+              widget.listDividerColor ?? CHATWOOT_LIST_DIVIDER_COLOR,
+          listEmptyIconColor:
+              widget.listEmptyIconColor ?? CHATWOOT_LIST_EMPTY_ICON_COLOR,
+          listEmptyTextColor:
+              widget.listEmptyTextColor ?? CHATWOOT_LIST_EMPTY_TEXT_COLOR,
           userAvatarNameColors: [
             widget.primaryColor ?? CHATWOOT_COLOR_PRIMARY
           ]),

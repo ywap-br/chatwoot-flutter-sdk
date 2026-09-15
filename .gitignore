@@ -79,3 +79,5 @@ build/
 /coverage/
 .serena/
 **/ios/Flutter/ephemeral/
+# Widget Preview related
+.widget_preview/

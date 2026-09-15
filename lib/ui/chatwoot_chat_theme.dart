@@ -25,6 +25,40 @@ const CHATWOOT_HEADER_FOREGROUND_COLOR = Colors.white;
 /// [CHATWOOT_COLOR_PRIMARY] bubble.
 const CHATWOOT_SENT_MESSAGE_TEXT_COLOR = Color(0xff111B21);
 
+/// Received message body text color -- matches [ChatTheme]'s own historical
+/// default so introducing [ChatwootChatTheme.receivedMessageBodyTextStyle]
+/// as a named constant here doesn't change anything by default.
+const CHATWOOT_RECEIVED_MESSAGE_TEXT_COLOR = Colors.black87;
+
+const CHATWOOT_SENT_MESSAGE_BODY_TEXT_STYLE = TextStyle(
+  color: CHATWOOT_SENT_MESSAGE_TEXT_COLOR,
+  fontSize: 16,
+  fontWeight: FontWeight.w500,
+  height: 1.5,
+);
+
+const CHATWOOT_RECEIVED_MESSAGE_BODY_TEXT_STYLE = TextStyle(
+  color: CHATWOOT_RECEIVED_MESSAGE_TEXT_COLOR,
+  fontSize: 16,
+  fontWeight: FontWeight.w500,
+  height: 1.5,
+);
+
+/// Recent-conversations list colors -- title, subtitle (last message
+/// preview), timestamp/chevron/snoozed-caption, row divider, and the empty
+/// state's icon/text. Each matches the literal [Colors.*] value
+/// [ChatwootRecentConversations] used before these existed, so introducing
+/// them doesn't change anything by default.
+const CHATWOOT_LIST_TITLE_COLOR = Colors.black87;
+const CHATWOOT_LIST_SUBTITLE_COLOR = Color(0xFF616161); // Colors.grey.shade700
+const CHATWOOT_LIST_TIMESTAMP_COLOR = Color(0xFF757575); // Colors.grey.shade600
+const CHATWOOT_LIST_DIVIDER_COLOR =
+    Color(0x269E9E9E); // Colors.grey @ 15% alpha
+const CHATWOOT_LIST_EMPTY_ICON_COLOR =
+    Color(0xFFE0E0E0); // Colors.grey.shade300
+const CHATWOOT_LIST_EMPTY_TEXT_COLOR =
+    Color(0xFF757575); // Colors.grey.shade600
+
 /// Default chatwoot chat theme which extends [ChatTheme]
 @immutable
 class ChatwootChatTheme extends ChatTheme {
@@ -79,6 +113,28 @@ class ChatwootChatTheme extends ChatTheme {
   /// individual agent photos.
   final String? avatarImageSource;
 
+  /// Title color for each row of [ChatwootRecentConversations] (the
+  /// ticket/conversation label).
+  final Color listTitleColor;
+
+  /// Subtitle color for each row of [ChatwootRecentConversations] (the
+  /// last-message preview).
+  final Color listSubtitleColor;
+
+  /// Muted secondary text color used for [ChatwootRecentConversations]:
+  /// the per-row timestamp, its chevron affordance, and the snoozed-until
+  /// caption.
+  final Color listTimestampColor;
+
+  /// Divider color between rows of [ChatwootRecentConversations].
+  final Color listDividerColor;
+
+  /// Icon color for [ChatwootRecentConversations]'s empty state.
+  final Color listEmptyIconColor;
+
+  /// Text color for [ChatwootRecentConversations]'s empty state.
+  final Color listEmptyTextColor;
+
   /// Creates a chatwoot chat theme. Use this constructor if you want to
   /// override only a couple of variables.
   const ChatwootChatTheme({
@@ -91,6 +147,12 @@ class ChatwootChatTheme extends ChatTheme {
     ),
     this.backgroundImageSource,
     this.avatarImageSource,
+    this.listTitleColor = CHATWOOT_LIST_TITLE_COLOR,
+    this.listSubtitleColor = CHATWOOT_LIST_SUBTITLE_COLOR,
+    this.listTimestampColor = CHATWOOT_LIST_TIMESTAMP_COLOR,
+    this.listDividerColor = CHATWOOT_LIST_DIVIDER_COLOR,
+    this.listEmptyIconColor = CHATWOOT_LIST_EMPTY_ICON_COLOR,
+    this.listEmptyTextColor = CHATWOOT_LIST_EMPTY_TEXT_COLOR,
     Widget? attachmentButtonIcon,
     Color backgroundColor = CHATWOOT_BG_COLOR,
     TextStyle dateDividerTextStyle = const TextStyle(
@@ -121,12 +183,8 @@ class ChatwootChatTheme extends ChatTheme {
     ),
     double messageBorderRadius = 12.0,
     Color primaryColor = CHATWOOT_COLOR_PRIMARY,
-    TextStyle receivedMessageBodyTextStyle = const TextStyle(
-      color: Colors.black87,
-      fontSize: 16,
-      fontWeight: FontWeight.w500,
-      height: 1.5,
-    ),
+    TextStyle receivedMessageBodyTextStyle =
+        CHATWOOT_RECEIVED_MESSAGE_BODY_TEXT_STYLE,
     TextStyle receivedMessageCaptionTextStyle = const TextStyle(
       color: NEUTRAL_2,
       fontSize: 12,
@@ -150,12 +208,7 @@ class ChatwootChatTheme extends ChatTheme {
     Widget? seenIcon,
     Widget? sendButtonIcon,
     Widget? sendingIcon,
-    TextStyle sentMessageBodyTextStyle = const TextStyle(
-      color: CHATWOOT_SENT_MESSAGE_TEXT_COLOR,
-      fontSize: 16,
-      fontWeight: FontWeight.w500,
-      height: 1.5,
-    ),
+    TextStyle sentMessageBodyTextStyle = CHATWOOT_SENT_MESSAGE_BODY_TEXT_STYLE,
     TextStyle sentMessageCaptionTextStyle = const TextStyle(
       color: NEUTRAL_7_WITH_OPACITY,
       fontSize: 12,
@@ -276,6 +329,12 @@ class ChatwootChatTheme extends ChatTheme {
     TextStyle? headerSubtitleTextStyle,
     String? backgroundImageSource,
     String? avatarImageSource,
+    Color? listTitleColor,
+    Color? listSubtitleColor,
+    Color? listTimestampColor,
+    Color? listDividerColor,
+    Color? listEmptyIconColor,
+    Color? listEmptyTextColor,
     Widget? attachmentButtonIcon,
     Color? backgroundColor,
     TextStyle? dateDividerTextStyle,
@@ -335,6 +394,12 @@ class ChatwootChatTheme extends ChatTheme {
       backgroundImageSource:
           backgroundImageSource ?? this.backgroundImageSource,
       avatarImageSource: avatarImageSource ?? this.avatarImageSource,
+      listTitleColor: listTitleColor ?? this.listTitleColor,
+      listSubtitleColor: listSubtitleColor ?? this.listSubtitleColor,
+      listTimestampColor: listTimestampColor ?? this.listTimestampColor,
+      listDividerColor: listDividerColor ?? this.listDividerColor,
+      listEmptyIconColor: listEmptyIconColor ?? this.listEmptyIconColor,
+      listEmptyTextColor: listEmptyTextColor ?? this.listEmptyTextColor,
       attachmentButtonIcon: attachmentButtonIcon ?? this.attachmentButtonIcon,
       backgroundColor: backgroundColor ?? this.backgroundColor,
       dateDividerTextStyle: dateDividerTextStyle ?? this.dateDividerTextStyle,

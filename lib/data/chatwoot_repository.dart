@@ -206,6 +206,43 @@ class ChatwootRepositoryImpl extends ChatwootRepository {
     if (token == null) {
       return;
     }
+
+    // Guard: `listenForEvents()` can be called more than once before
+    // `confirm_subscription` arrives -- e.g. `initialize()` calls it
+    // unconditionally on startup, and `sendMessage()` calls it again
+    // whenever `_isListeningForEvents` is still false, which race easily
+    // when a message is sent right after opening the chat. Without this,
+    // each call stacked another live subscription onto the same/next
+    // websocket stream, so a single realtime event (like `message_created`
+    // for a sender-less bot/system message) dispatched its callback once
+    // per stacked subscription, rendering the same message more than once.
+    // Cancelling any previous subscription(s) first keeps at most one live
+    // listener at a time, covering both "called from more than one place"
+    // and "reconnection without cancelling the previous subscription".
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    _subscriptions.clear();
+    _isListeningForEvents = false;
+
+    // Close any previous physical websocket connection before opening a
+    // new one. `startWebSocketConnection` below always calls
+    // `WebSocketChannel.connect()` and overwrites `clientService.connection`
+    // -- without this, the old socket was left orphaned, physically open
+    // forever (a real client/server connection leak), every time
+    // `listenForEvents()` ran more than once (e.g. `initialize()` calling
+    // it unconditionally, plus `sendMessage()` calling it again whenever
+    // `_isListeningForEvents` is still false, which races easily right
+    // after opening the chat). Worse, any event the server pushed to that
+    // orphaned socket between cancelling the Dart subscription above and
+    // the new one confirming was silently lost. Closing the previous
+    // connection first keeps at most one live physical socket, so there is
+    // never a window where the server can push to a socket nobody is
+    // listening to anymore.
+    if (clientService.connection != null) {
+      clientService.closeConnection();
+    }
+
     clientService.startWebSocketConnection(
         localStorage.contactDao.getContact()!.pubsubToken ?? "");
 
@@ -227,9 +264,20 @@ class ChatwootRepositoryImpl extends ChatwootRepository {
         final message = chatwootEvent.message!.data!.getMessage();
         localStorage.messagesDao.saveMessage(message);
         if (message.isMine) {
-          callbacks.onMessageDelivered
-              ?.call(message, chatwootEvent.message!.data!.echoId!);
+          // Defensive: `echo_id` is only guaranteed for a message this
+          // client itself just sent (see ChatwootRepository.sendMessage).
+          // A null echo_id here would previously crash this listener via
+          // `!`, silently killing the realtime stream for every message
+          // after it. Falling back to the message's own id keeps
+          // onMessageDelivered's contract (a non-null id) without ever
+          // throwing on an unexpected shape.
+          callbacks.onMessageDelivered?.call(message,
+              chatwootEvent.message!.data!.echoId ?? message.id.toString());
         } else {
+          // With the isMine fix above, bot/system messages (message_type 3,
+          // sender_type/sender_id null) land here -- inserted straight into
+          // the UI via onMessageReceived, same as any other agent message,
+          // instead of depending on an echo_id these payloads never carry.
           callbacks.onMessageReceived?.call(message);
         }
       } else if (chatwootEvent.message?.event ==

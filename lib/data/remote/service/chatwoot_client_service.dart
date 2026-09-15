@@ -40,6 +40,12 @@ abstract class ChatwootClientService {
   void startWebSocketConnection(String contactPubsubToken,
       {WebSocketChannel Function(Uri)? onStartConnection});
 
+  /// Closes the current physical websocket connection ([connection]), if
+  /// any, without opening a new one. Safe to call when there is no
+  /// connection yet (null-safe) and safe to call more than once in a row
+  /// (idempotent) -- see [ChatwootClientServiceImpl.closeConnection].
+  void closeConnection();
+
   void sendAction(String contactPubsubToken, ChatwootActionType action);
 }
 
@@ -63,8 +69,7 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
             ChatwootClientExceptionType.SEND_MESSAGE_FAILED);
       }
     } on DioException catch (e) {
-      throw ChatwootClientException(
-          ChatwootClientException.extractError(e),
+      throw ChatwootClientException(ChatwootClientException.extractError(e),
           ChatwootClientExceptionType.SEND_MESSAGE_FAILED);
     } catch (e) {
       throw ChatwootClientException(
@@ -88,8 +93,7 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
             ChatwootClientExceptionType.GET_MESSAGES_FAILED);
       }
     } on DioException catch (e) {
-      throw ChatwootClientException(
-          ChatwootClientException.extractError(e),
+      throw ChatwootClientException(ChatwootClientException.extractError(e),
           ChatwootClientExceptionType.GET_MESSAGES_FAILED);
     } catch (e) {
       throw ChatwootClientException(
@@ -111,8 +115,7 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
             ChatwootClientExceptionType.GET_CONTACT_FAILED);
       }
     } on DioException catch (e) {
-      throw ChatwootClientException(
-          ChatwootClientException.extractError(e),
+      throw ChatwootClientException(ChatwootClientException.extractError(e),
           ChatwootClientExceptionType.GET_CONTACT_FAILED);
     } catch (e) {
       throw ChatwootClientException(
@@ -136,8 +139,7 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
             ChatwootClientExceptionType.GET_CONVERSATION_FAILED);
       }
     } on DioException catch (e) {
-      throw ChatwootClientException(
-          ChatwootClientException.extractError(e),
+      throw ChatwootClientException(ChatwootClientException.extractError(e),
           ChatwootClientExceptionType.GET_CONVERSATION_FAILED);
     } catch (e) {
       throw ChatwootClientException(
@@ -159,8 +161,7 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
             ChatwootClientExceptionType.CREATE_CONVERSATION_FAILED);
       }
     } on DioException catch (e) {
-      throw ChatwootClientException(
-          ChatwootClientException.extractError(e),
+      throw ChatwootClientException(ChatwootClientException.extractError(e),
           ChatwootClientExceptionType.CREATE_CONVERSATION_FAILED);
     } catch (e) {
       throw ChatwootClientException(
@@ -185,8 +186,7 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
             ChatwootClientExceptionType.GET_MESSAGES_FAILED);
       }
     } on DioException catch (e) {
-      throw ChatwootClientException(
-          ChatwootClientException.extractError(e),
+      throw ChatwootClientException(ChatwootClientException.extractError(e),
           ChatwootClientExceptionType.GET_MESSAGES_FAILED);
     } catch (e) {
       throw ChatwootClientException(
@@ -209,8 +209,7 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
             ChatwootClientExceptionType.UPDATE_CONTACT_FAILED);
       }
     } on DioException catch (e) {
-      throw ChatwootClientException(
-          ChatwootClientException.extractError(e),
+      throw ChatwootClientException(ChatwootClientException.extractError(e),
           ChatwootClientExceptionType.UPDATE_CONTACT_FAILED);
     } catch (e) {
       throw ChatwootClientException(
@@ -234,8 +233,7 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
             ChatwootClientExceptionType.UPDATE_MESSAGE_FAILED);
       }
     } on DioException catch (e) {
-      throw ChatwootClientException(
-          ChatwootClientException.extractError(e),
+      throw ChatwootClientException(ChatwootClientException.extractError(e),
           ChatwootClientExceptionType.UPDATE_MESSAGE_FAILED);
     } catch (e) {
       throw ChatwootClientException(
@@ -255,6 +253,21 @@ class ChatwootClientServiceImpl extends ChatwootClientService {
       "identifier": jsonEncode(
           {"channel": "RoomChannel", "pubsub_token": contactPubsubToken})
     }));
+  }
+
+  /// Closes the previous physical websocket connection before it gets
+  /// replaced/orphaned. Without this, [startWebSocketConnection] always
+  /// called [WebSocketChannel.connect] and overwrote [connection], leaving
+  /// any prior socket physically open forever (a real client/server
+  /// connection leak) -- see the call site in
+  /// `ChatwootRepositoryImpl.listenForEvents`.
+  ///
+  /// Null-safe: does nothing when [connection] is already null.
+  /// Idempotent: [WebSocketSink.close] is documented to do nothing after
+  /// the first call, so calling this more than once in a row is harmless.
+  @override
+  void closeConnection() {
+    connection?.sink.close();
   }
 
   @override

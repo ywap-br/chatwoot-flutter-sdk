@@ -405,6 +405,15 @@ class MockChatwootClientService extends _i1.Mock
       );
 
   @override
+  void closeConnection() => super.noSuchMethod(
+        Invocation.method(
+          #closeConnection,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
   void sendAction(
     String? contactPubsubToken,
     _i15.ChatwootActionType? action,

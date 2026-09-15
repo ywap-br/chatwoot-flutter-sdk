@@ -58,7 +58,14 @@ class ChatwootMessage extends Equatable {
   final ChatwootEventMessageUser? sender;
 
   ///checks if message belongs to contact making the request
-  bool get isMine => messageType != 1;
+  ///
+  ///Only `message_type == 0` (incoming, from the contact) is "mine". Every
+  ///other type -- 1 (outgoing, from an agent), 2 (activity/private note) and
+  ///3 (template/system, e.g. a bot reply) -- must render as received, even
+  ///when `sender_type`/`sender_id` are null (as they are for template/system
+  ///messages). The previous `messageType != 1` conflated type 3 with "mine",
+  ///rendering bot/system messages as sent by the user.
+  bool get isMine => messageType == 0;
 
   ChatwootMessage(
       {required this.id,

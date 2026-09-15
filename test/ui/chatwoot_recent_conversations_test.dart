@@ -1,12 +1,26 @@
 import 'package:chatwoot_sdk/data/local/entity/chatwoot_contact.dart';
 import 'package:chatwoot_sdk/data/local/entity/chatwoot_conversation.dart';
 import 'package:chatwoot_sdk/data/local/entity/chatwoot_message.dart';
+import 'package:chatwoot_sdk/ui/chatwoot_l10n.dart';
 import 'package:chatwoot_sdk/ui/chatwoot_recent_conversations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group("ChatwootRecentConversations Tests", () {
+    // ChatwootRecentConversations defaults to `const ChatwootL10n()`, whose
+    // strings are the SDK's own PT-BR defaults (see chatwoot_l10n.dart) and
+    // change independently of this widget. Pinning an explicit l10n here
+    // keeps these assertions stable across default-copy changes -- these
+    // are the same strings the test originally asserted against.
+    const testL10n = ChatwootL10n(
+      noConversationsText: "No conversations found",
+      startNewConversationText: "Start new conversation",
+      ticketBadgeLabel: "Conversa #{id}",
+      conversationStatusOpen: "Open",
+      conversationStatusResolved: "Resolved",
+    );
+
     final testContact = ChatwootContact(
       id: 1,
       contactIdentifier: "contact_1",
@@ -57,6 +71,7 @@ void main() {
               onNewConversation: () {
                 newConversationCalled = true;
               },
+              l10n: testL10n,
             ),
           ),
         ),
@@ -85,6 +100,7 @@ void main() {
                 selectedConversation = conv;
               },
               onNewConversation: () {},
+              l10n: testL10n,
             ),
           ),
         ),
@@ -117,6 +133,7 @@ void main() {
               onNewConversation: () {
                 newConversationTapped = true;
               },
+              l10n: testL10n,
             ),
           ),
         ),

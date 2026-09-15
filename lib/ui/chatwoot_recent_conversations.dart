@@ -183,7 +183,7 @@ class ChatwootRecentConversations extends StatelessWidget {
           color: theme.secondaryColor,
           border: Border(
             bottom: BorderSide(
-              color: Colors.grey.withValues(alpha: 0.15),
+              color: theme.listDividerColor,
               width: 1,
             ),
           ),
@@ -211,7 +211,10 @@ class ChatwootRecentConversations extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: statusColor,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                      // Ring matches the row background (theme.secondaryColor)
+                      // rather than a fixed white, so it still reads as a
+                      // "notch" against the avatar on a themed/dark row.
+                      border: Border.all(color: theme.secondaryColor, width: 2),
                     ),
                   ),
                 ),
@@ -228,10 +231,10 @@ class ChatwootRecentConversations extends StatelessWidget {
                       Text(
                         l10n.ticketBadgeLabel
                             .replaceAll('{id}', '${conversation.id}'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: theme.listTitleColor,
                         ),
                       ),
                       if (timeString.isNotEmpty)
@@ -239,7 +242,7 @@ class ChatwootRecentConversations extends StatelessWidget {
                           timeString,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade600,
+                            color: theme.listTimestampColor,
                           ),
                         ),
                     ],
@@ -255,7 +258,7 @@ class ChatwootRecentConversations extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.grey.shade700,
+                            color: theme.listSubtitleColor,
                           ),
                         ),
                       ),
@@ -271,7 +274,7 @@ class ChatwootRecentConversations extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.blueGrey.shade400,
+                        color: theme.listTimestampColor,
                       ),
                     ),
                   ],
@@ -281,7 +284,7 @@ class ChatwootRecentConversations extends StatelessWidget {
             const SizedBox(width: 4),
             Icon(
               Icons.chevron_right,
-              color: Colors.grey.shade400,
+              color: theme.listTimestampColor,
               size: 20,
             ),
           ],
@@ -300,7 +303,7 @@ class ChatwootRecentConversations extends StatelessWidget {
             Icon(
               Icons.chat_outlined,
               size: 64,
-              color: Colors.grey.shade300,
+              color: theme.listEmptyIconColor,
             ),
             const SizedBox(height: 16),
             Text(
@@ -308,7 +311,7 @@ class ChatwootRecentConversations extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey.shade600,
+                color: theme.listEmptyTextColor,
               ),
               textAlign: TextAlign.center,
             ),

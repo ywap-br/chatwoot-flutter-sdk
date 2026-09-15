@@ -40,6 +40,14 @@ class ChatwootL10n extends ChatL10n {
   /// current status rather than being a one-off inserted chat message.
   final String conversationResolvedMessage;
 
+  /// Sticky banner shown over the message list whenever the active
+  /// conversation's status is snoozed and its `snoozed_until` timestamp
+  /// parses, with `{date}` replaced by that timestamp formatted as
+  /// `dd/MM/yyyy HH:mm`. Falls back to [conversationStatusSnoozed] when
+  /// `snoozed_until` is missing or fails to parse, same tolerant-of-bad-data
+  /// spirit as [conversationResolvedMessage]'s banner.
+  final String conversationSnoozedMessage;
+
   /// Message when agent resolves conversation
   final String and;
 
@@ -86,9 +94,12 @@ class ChatwootL10n extends ChatL10n {
   /// the conversation's numeric id.
   final String ticketBadgeLabel;
 
-  /// System message inserted into a brand new conversation right after
-  /// "Iniciar nova conversa" succeeds, with `{id}` replaced by the newly
-  /// created conversation's numeric id.
+  /// Unused. Used to be inserted as a synthetic system message right after
+  /// "Iniciar nova conversa" succeeded, with `{id}` replaced by the newly
+  /// created conversation's numeric id. [ChatwootChat.onConversationCreated]
+  /// (see `_ChatwootChatState` in chatwoot_chat_page.dart) no longer shows
+  /// that notice -- a new conversation now starts genuinely empty. Kept for
+  /// backwards compatibility with host apps that already set it.
   final String ticketOpenedMessage;
 
   /// Creates a new chatwoot l10n
@@ -105,6 +116,8 @@ class ChatwootL10n extends ChatL10n {
       this.sendButtonAccessibilityLabel = "Enviar mensagem",
       this.conversationResolvedMessage = "Essa conversa foi marcada como "
           "resolvida, mandar uma nova mensagem irá reabrir esse atendimento",
+      this.conversationSnoozedMessage = "O ticket foi marcado como em "
+          "espera, com prazo para retorno em: {date}",
       this.and = "e",
       this.isTyping = "está digitando...",
       this.others = "outros",
@@ -145,6 +158,7 @@ class ChatwootL10n extends ChatL10n {
     String? defaultChatTitle,
     String? sendButtonAccessibilityLabel,
     String? conversationResolvedMessage,
+    String? conversationSnoozedMessage,
     String? and,
     String? isTyping,
     String? others,
@@ -177,6 +191,8 @@ class ChatwootL10n extends ChatL10n {
           sendButtonAccessibilityLabel ?? this.sendButtonAccessibilityLabel,
       conversationResolvedMessage:
           conversationResolvedMessage ?? this.conversationResolvedMessage,
+      conversationSnoozedMessage:
+          conversationSnoozedMessage ?? this.conversationSnoozedMessage,
       and: and ?? this.and,
       isTyping: isTyping ?? this.isTyping,
       others: others ?? this.others,

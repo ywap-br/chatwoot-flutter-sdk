@@ -440,6 +440,35 @@ void main() {
     });
 
     test(
+        'Given no connection has been established when closeConnection is called, then it does nothing (null-safe)',
+        () {
+      //GIVEN
+      final freshClientService =
+          ChatwootClientServiceImpl(testBaseUrl, dio: mockDio);
+
+      //WHEN //THEN
+      expect(() => freshClientService.closeConnection(), returnsNormally);
+    });
+
+    test(
+        'Given an existing connection when closeConnection is called, then its sink is closed, and calling it again is a harmless no-op (idempotent)',
+        () async {
+      //GIVEN
+      final mockWebSocketChannel = MockWebSocketChannel();
+      final mockWebSocketSink = MockWebSocketSink();
+      when(mockWebSocketChannel.sink).thenReturn(mockWebSocketSink);
+      when(mockWebSocketSink.close()).thenAnswer((_) => Future.value({}));
+      clientService.connection = mockWebSocketChannel;
+
+      //WHEN
+      clientService.closeConnection();
+      clientService.closeConnection();
+
+      //THEN
+      verify(mockWebSocketSink.close()).called(2);
+    });
+
+    test(
         'Given action is sent successfully when sendAction is called, then websocket sink should be triggered',
         () async {
       //GIVEN

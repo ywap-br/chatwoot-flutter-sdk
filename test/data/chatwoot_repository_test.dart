@@ -558,6 +558,94 @@ void main() {
     });
 
     test(
+        'Given a bot/system message.created event (message_type 3, sender_type/sender_id null, no echo_id) is received, then onMessageReceived should be triggered instead of onMessageDelivered',
+        () async {
+      //GIVEN
+      when(mockLocalStorage.dispose()).thenAnswer((_) => (_) {});
+      when(mockChatwootCallbacks.onMessageReceived).thenAnswer((_) => (_) {});
+      when(mockChatwootCallbacks.onMessageDelivered)
+          .thenAnswer((_) => (_, __) {});
+      when(mockMessagesDao.saveMessage(any))
+          .thenAnswer((_) => Future.microtask(() {}));
+      // Real-world shape reported for a bot/automation reply: no echo_id
+      // (this client never sent it), sender_type/sender_id null. Before the
+      // isMine fix this fell into the onMessageDelivered branch, forcing a
+      // non-null read of a null echo_id and silently killing the listener.
+      final dynamic botMessageEvent = {
+        "type": "message",
+        "message": {
+          "event": "message.created",
+          "data": {
+            "id": 9001,
+            "content": "Sua fatura foi enviada por e-mail.",
+            "message_type": 3,
+            "content_type": "text",
+            "content_attributes": {},
+            "created_at": DateTime.now().toString(),
+            "conversation_id": 202,
+            "sender_type": null,
+            "sender_id": null,
+            "attachments": [],
+          }
+        }
+      };
+
+      repo.listenForEvents();
+
+      //WHEN
+      mockWebSocketStream.add(jsonEncode(botMessageEvent));
+      await Future.delayed(Duration(seconds: 1));
+
+      //THEN
+      final message =
+          ChatwootMessage.fromJson(botMessageEvent["message"]["data"]);
+      expect(message.isMine, isFalse);
+      verify(mockChatwootCallbacks.onMessageReceived?.call(message));
+      // The isMine branch (onMessageDelivered) is never even entered for
+      // this message, so its getter is never accessed.
+      verifyNever(mockChatwootCallbacks.onMessageDelivered);
+    });
+
+    test(
+        'Given a message.created event for my own message arrives without echo_id, then onMessageDelivered falls back to the message id instead of throwing',
+        () async {
+      //GIVEN
+      when(mockLocalStorage.dispose()).thenAnswer((_) => (_) {});
+      when(mockChatwootCallbacks.onMessageDelivered)
+          .thenAnswer((_) => (_, __) {});
+      when(mockMessagesDao.saveMessage(any))
+          .thenAnswer((_) => Future.microtask(() {}));
+      final dynamic noEchoIdEvent = {
+        "type": "message",
+        "message": {
+          "event": "message.created",
+          "data": {
+            "id": 9002,
+            "content": "conteudo",
+            "message_type": 0,
+            "content_type": "text",
+            "content_attributes": {},
+            "created_at": DateTime.now().toString(),
+            "conversation_id": 202,
+            "attachments": [],
+          }
+        }
+      };
+
+      repo.listenForEvents();
+
+      //WHEN
+      mockWebSocketStream.add(jsonEncode(noEchoIdEvent));
+      await Future.delayed(Duration(seconds: 1));
+
+      //THEN
+      final message =
+          ChatwootMessage.fromJson(noEchoIdEvent["message"]["data"]);
+      verify(mockChatwootCallbacks.onMessageDelivered
+          ?.call(message, message.id.toString()));
+    });
+
+    test(
         'Given unknown event is received when listening for events, then no callback event should be triggered',
         () async {
       //GIVEN
@@ -572,6 +660,34 @@ void main() {
       //THEN
       verifyZeroInteractions(mockChatwootCallbacks);
       repo.dispose();
+    });
+
+    test(
+        'Given listenForEvents is called twice in a row, then the previous physical websocket connection is closed before the new one is started',
+        () async {
+      //GIVEN
+      when(mockLocalStorage.dispose()).thenAnswer((_) => (_) {});
+      when(mockChatwootClientService.closeConnection())
+          .thenAnswer((_) => (_) {});
+
+      //WHEN
+      repo.listenForEvents();
+      repo.listenForEvents();
+
+      //THEN
+      // `closeConnection` is called once per `listenForEvents()` call that
+      // finds an existing `clientService.connection` (the shared mock is
+      // stubbed in setUpAll to always return a non-null connection), and
+      // always before `startWebSocketConnection` opens the replacement --
+      // otherwise the previous physical socket is left orphaned (leaked)
+      // and can silently lose an event pushed between the old Dart
+      // subscription being cancelled and the new one confirming.
+      verifyInOrder([
+        mockChatwootClientService.closeConnection(),
+        mockChatwootClientService.startWebSocketConnection(any),
+        mockChatwootClientService.closeConnection(),
+        mockChatwootClientService.startWebSocketConnection(any),
+      ]);
     });
 
     test(

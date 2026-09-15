@@ -104,6 +104,81 @@ void main() {
     });
 
     test(
+        'Given contact creation returns a bare 500 (returned, not thrown) and the identifier already exists server-side when createNewContact is called, then recover the existing contact instead of throwing',
+        () async {
+      //GIVEN
+      final responseBody =
+          await TestResourceUtil.readJsonResource(fileName: "contact");
+      when(mockDio.post(any, data: testUser.toJson())).thenAnswer(
+          (_) => Future.value(_createErrorResponse(statusCode: 500, body: {})));
+      when(mockDio.get(
+              "/public/api/v1/inboxes/$testInboxIdentifier/contacts/${testUser.identifier}"))
+          .thenAnswer(
+              (_) => Future.value(_createSuccessResponse(responseBody)));
+
+      //WHEN
+      final result =
+          await clientService.createNewContact(testInboxIdentifier, testUser);
+
+      //THEN
+      expect(result, ChatwootContact.fromJson(responseBody));
+    });
+
+    test(
+        'Given contact creation throws a DioException carrying a 500 response and the identifier already exists server-side when createNewContact is called, then recover the existing contact instead of throwing',
+        () async {
+      //GIVEN
+      // This is the realistic production shape: dio's default
+      // validateStatus rejects any non-2xx and throws, attaching the
+      // original response (see chatwoot_client_auth_service.dart's
+      // createNewContact doc comment for why the SDK must handle both
+      // shapes).
+      final responseBody =
+          await TestResourceUtil.readJsonResource(fileName: "contact");
+      final serverError = DioException(
+          requestOptions: RequestOptions(path: ""),
+          response: _createErrorResponse(statusCode: 500, body: {}),
+          type: DioExceptionType.badResponse);
+      when(mockDio.post(any, data: testUser.toJson())).thenThrow(serverError);
+      when(mockDio.get(
+              "/public/api/v1/inboxes/$testInboxIdentifier/contacts/${testUser.identifier}"))
+          .thenAnswer(
+              (_) => Future.value(_createSuccessResponse(responseBody)));
+
+      //WHEN
+      final result =
+          await clientService.createNewContact(testInboxIdentifier, testUser);
+
+      //THEN
+      expect(result, ChatwootContact.fromJson(responseBody));
+    });
+
+    test(
+        'Given contact creation returns 500 and no existing contact can be recovered when createNewContact is called, then still throw CREATE_CONTACT_FAILED',
+        () async {
+      //GIVEN
+      when(mockDio.post(any, data: testUser.toJson())).thenAnswer(
+          (_) => Future.value(_createErrorResponse(statusCode: 500, body: {})));
+      when(mockDio.get(
+              "/public/api/v1/inboxes/$testInboxIdentifier/contacts/${testUser.identifier}"))
+          .thenAnswer((_) =>
+              Future.value(_createErrorResponse(statusCode: 404, body: {})));
+
+      //WHEN
+      ChatwootClientException? chatwootClientException;
+      try {
+        await clientService.createNewContact(testInboxIdentifier, testUser);
+      } on ChatwootClientException catch (e) {
+        chatwootClientException = e;
+      }
+
+      //THEN
+      expect(chatwootClientException, isNotNull);
+      expect(chatwootClientException!.type,
+          equals(ChatwootClientExceptionType.CREATE_CONTACT_FAILED));
+    });
+
+    test(
         'Given conversation is successfully created when createNewConversation is called, then return created conversation',
         () async {
       //GIVEN
