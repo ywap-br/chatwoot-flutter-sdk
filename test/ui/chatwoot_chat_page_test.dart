@@ -7,6 +7,7 @@ import 'package:chatwoot_sdk/data/local/entity/chatwoot_message.dart';
 import 'package:chatwoot_sdk/ui/chatwoot_chat_page.dart';
 import 'package:chatwoot_sdk/ui/chatwoot_chat_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -45,6 +46,25 @@ void main() {
       contact: testContact,
       status: "open",
       messages: const [],
+    );
+  }
+
+  ChatwootMessage buildMessage({
+    required int id,
+    required int conversationId,
+    String content = 'msg',
+    int messageType = 0,
+  }) {
+    return ChatwootMessage(
+      id: id,
+      content: content,
+      messageType: messageType,
+      contentType: 'text',
+      contentAttributes: null,
+      createdAt: DateTime.now().toIso8601String(),
+      conversationId: conversationId,
+      attachments: const [],
+      sender: null,
     );
   }
 
@@ -357,25 +377,6 @@ void main() {
   // incremental mutation), crashing with "child == null || indexOf(child)
   // > index" followed by duplicate-GlobalKey/deactivated-widget errors.
   group('ChatwootChat cross-conversation message isolation', () {
-    ChatwootMessage buildMessage({
-      required int id,
-      required int conversationId,
-      String content = 'msg',
-      int messageType = 0,
-    }) {
-      return ChatwootMessage(
-        id: id,
-        content: content,
-        messageType: messageType,
-        contentType: 'text',
-        contentAttributes: null,
-        createdAt: DateTime.now().toIso8601String(),
-        conversationId: conversationId,
-        attachments: const [],
-        sender: null,
-      );
-    }
-
     testWidgets(
         'onMessagesRetrieved with messages from two conversations of the same contact only merges the active conversation\'s messages',
         (WidgetTester tester) async {
@@ -626,6 +627,100 @@ void main() {
       // Only conversation 43's messages (102 and 105) ever entered
       // `_messages` -- 101/103/104 (conversation 48) never leaked in.
       expect(chatWidget.messages.map((m) => m.id).toSet(), {'102', '105'});
+    });
+  });
+
+  group('ChatwootChat rapid message sending race condition', () {
+    testWidgets(
+        'delivery confirmation arriving while another message is being sent does not overwrite or duplicate messages',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChatwootChat(
+            baseUrl: 'https://example.invalid',
+            inboxIdentifier: 'inbox',
+            showConversationHistory: false,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final dynamic chatState = tester.state(find.byType(ChatwootChat));
+      chatState.chatwootCallbacks.onConversationCreated(buildConversation(43));
+      await tester.pump();
+
+      final user = types.User(id: 'test-user');
+      final msg1 = types.TextMessage(
+        id: 'echo-1',
+        author: user,
+        text: 'msg 1',
+        status: types.Status.sending,
+      );
+      chatState.addMessageForTesting(msg1);
+
+      // Delivery arrives for msg 1 (echoId 'echo-1'), queuing addPostFrameCallback with index 0
+      final delivered1 = buildMessage(id: 101, conversationId: 43, content: 'msg 1');
+      chatState.chatwootCallbacks.onMessageDelivered(delivered1, 'echo-1');
+
+      // User rapidly sends msg 2 BEFORE the next pump/frame
+      final msg2 = types.TextMessage(
+        id: 'echo-2',
+        author: user,
+        text: 'msg 2',
+        status: types.Status.sending,
+      );
+      chatState.addMessageForTesting(msg2);
+
+      await tester.pump();
+
+      final chatWidget = tester.widget<Chat>(find.byType(Chat));
+      final messageIds = chatWidget.messages.map((m) => m.id).toList();
+
+      expect(messageIds, contains('echo-1'));
+      expect(messageIds, contains('echo-2'));
+      expect(messageIds.length, 2);
+      expect(messageIds.toSet().length, 2,
+          reason: 'Must not contain duplicate message IDs');
+    });
+
+    testWidgets(
+        'onMessagesRetrieved does not duplicate a message that is already in _messages with a different status',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChatwootChat(
+            baseUrl: 'https://example.invalid',
+            inboxIdentifier: 'inbox',
+            showConversationHistory: false,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final dynamic chatState = tester.state(find.byType(ChatwootChat));
+      chatState.chatwootCallbacks.onConversationCreated(buildConversation(43));
+      await tester.pump();
+
+      final user = types.User(id: 'test-user');
+      final msgSending = types.TextMessage(
+        id: '101',
+        author: user,
+        text: 'msg 101',
+        status: types.Status.sending,
+      );
+      chatState.addMessageForTesting(msgSending);
+      await tester.pump();
+
+      final serverMsg =
+          buildMessage(id: 101, conversationId: 43, content: 'msg 101');
+      chatState.chatwootCallbacks.onMessagesRetrieved([serverMsg]);
+      await tester.pump();
+
+      final chatWidget = tester.widget<Chat>(find.byType(Chat));
+      final messageIds = chatWidget.messages.map((m) => m.id).toList();
+
+      expect(messageIds.length, 1);
+      expect(messageIds.single, '101');
     });
   });
 }

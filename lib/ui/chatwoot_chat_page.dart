@@ -8,6 +8,7 @@ import 'package:chatwoot_sdk/ui/chatwoot_chat_theme.dart';
 import 'package:chatwoot_sdk/ui/chatwoot_l10n.dart';
 import 'package:chatwoot_sdk/ui/chatwoot_recent_conversations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:intl/intl.dart';
@@ -312,10 +313,15 @@ class _ChatwootChatState extends State<ChatwootChat> {
                   .where((message) =>
                       message.conversationId == activeConversationId)
                   .toList();
-          setState(() {
-            _messages = scopedMessages
+          _safeSetState(() {
+            final chatMessages = scopedMessages
                 .map((message) => _chatwootMessageToTextMessage(message))
                 .toList();
+            final deduped = <String, types.Message>{};
+            for (final m in chatMessages) {
+              deduped[m.id] = m;
+            }
+            _messages = deduped.values.toList();
           });
         }
         widget.onPersistedMessagesRetrieved?.call(persistedMessages);
@@ -338,14 +344,21 @@ class _ChatwootChatState extends State<ChatwootChat> {
                   (message) => message.conversationId == activeConversationId)
               .toList();
           if (scopedMessages.isNotEmpty) {
-            setState(() {
+            _safeSetState(() {
               final chatMessages = scopedMessages
                   .map((message) => _chatwootMessageToTextMessage(message))
                   .toList();
-              final mergedMessages = <types.Message>[
-                ..._messages,
-                ...chatMessages
-              ].toSet().toList();
+              // Deduplicate by message.id to prevent duplicate keys in ChatList/
+              // SliverAnimatedList when a message was already present with
+              // a different status (e.g. sending vs seen).
+              final mergedMap = <String, types.Message>{};
+              for (final m in _messages) {
+                mergedMap[m.id] = m;
+              }
+              for (final m in chatMessages) {
+                mergedMap[m.id] = m;
+              }
+              final mergedMessages = mergedMap.values.toList();
               final now = DateTime.now().millisecondsSinceEpoch;
               mergedMessages.sort((a, b) {
                 return (b.createdAt ?? now).compareTo(a.createdAt ?? now);
@@ -506,6 +519,19 @@ class _ChatwootChatState extends State<ChatwootChat> {
         createdAt: DateTime.parse(message.createdAt).millisecondsSinceEpoch);
   }
 
+  void _safeSetState(VoidCallback fn) {
+    if (!mounted) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(fn);
+      });
+    } else {
+      setState(fn);
+    }
+  }
+
   void _addMessage(types.Message message) {
     // Defensive: skip if a message with this id is already present. Cheap,
     // safe, and prevents duplicate bubbles even if `onMessageReceived`
@@ -513,36 +539,46 @@ class _ChatwootChatState extends State<ChatwootChat> {
     // server retry, etc.) -- see `listenForEvents()` in
     // chatwoot_repository.dart for the actual duplicate-subscription root
     // cause this also guards against.
-    if (_messages.any((element) => element.id == message.id)) {
-      return;
-    }
-    setState(() {
-      _messages.insert(0, message);
+    _safeSetState(() {
+      if (_messages.any((element) => element.id == message.id)) {
+        return;
+      }
+      _messages = [message, ..._messages];
     });
   }
 
+  @visibleForTesting
+  void addMessageForTesting(types.Message message) => _addMessage(message);
+
   void _handleSendMessageFailed(String echoId) async {
-    final index = _messages.indexWhere((element) => element.id == echoId);
-    // Defensive: this fires from the async SEND_MESSAGE_FAILED error
-    // callback (see repository's `sendMessage`), which can land after the
-    // echoed message it refers to is gone from `_messages` -- e.g. the user
-    // switched conversations (`_handleSelectConversation` replaces
-    // `_messages` wholesale) before the network error came back. Same
-    // RangeError-on-`_messages[-1]` shape as `_handleMessageSent`/
-    // `_handleMessageUpdated`; skip instead of crashing.
-    if (index == -1) {
-      return;
-    }
-    setState(() {
-      _messages[index] = _messages[index].copyWith(status: types.Status.error);
+    _safeSetState(() {
+      final index = _messages.indexWhere((element) => element.id == echoId);
+      // Defensive: this fires from the async SEND_MESSAGE_FAILED error
+      // callback (see repository's `sendMessage`), which can land after the
+      // echoed message it refers to is gone from `_messages` -- e.g. the user
+      // switched conversations (`_handleSelectConversation` replaces
+      // `_messages` wholesale) before the network error came back. Same
+      // RangeError-on-`_messages[-1]` shape as `_handleMessageSent`/
+      // `_handleMessageUpdated`; skip instead of crashing.
+      if (index == -1) {
+        return;
+      }
+      final updated = List<types.Message>.of(_messages);
+      updated[index] = updated[index].copyWith(status: types.Status.error);
+      _messages = updated;
     });
   }
 
   void _handleResendMessage(types.TextMessage message) async {
-    chatwootClient!.sendMessage(content: message.text, echoId: message.id);
-    final index = _messages.indexWhere((element) => element.id == message.id);
-    setState(() {
-      _messages[index] = message.copyWith(status: types.Status.sending);
+    chatwootClient?.sendMessage(content: message.text, echoId: message.id);
+    _safeSetState(() {
+      final index = _messages.indexWhere((element) => element.id == message.id);
+      if (index == -1) {
+        return;
+      }
+      final updated = List<types.Message>.of(_messages);
+      updated[index] = message.copyWith(status: types.Status.sending);
+      _messages = updated;
     });
   }
 
@@ -557,64 +593,75 @@ class _ChatwootChatState extends State<ChatwootChat> {
     types.TextMessage message,
     types.PreviewData previewData,
   ) {
-    final index = _messages.indexWhere((element) => element.id == message.id);
-    final updatedMetaData = _messages[index].metadata ?? Map();
-    updatedMetaData["previewData"] = previewData;
-    final updatedMessage = _messages[index].copyWith(metadata: updatedMetaData);
+    _safeSetState(() {
+      final index = _messages.indexWhere((element) => element.id == message.id);
+      if (index == -1) {
+        return;
+      }
+      final updatedMetaData =
+          Map<String, dynamic>.from(_messages[index].metadata ?? const {});
+      updatedMetaData["previewData"] = previewData;
+      final updatedMessage =
+          _messages[index].copyWith(metadata: updatedMetaData);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() {
-        _messages[index] = updatedMessage;
-      });
+      final updated = List<types.Message>.of(_messages);
+      updated[index] = updatedMessage;
+      _messages = updated;
     });
   }
 
   void _handleMessageSent(
     types.Message message,
   ) {
-    final index = _messages.indexWhere((element) => element.id == message.id);
-    // Defensive: this is called from the async `onMessageDelivered`/
-    // `onMessageSent` callbacks, which can arrive after the echoed message
-    // they refer to is gone from `_messages` -- e.g. the user sent a
-    // message (local echo via `_addMessage`), then switched conversations
-    // (`_handleSelectConversation` replaces `_messages` wholesale) before
-    // the delivery/sent confirmation came back. `_messages[-1]` throws a
-    // RangeError in Dart, crashing the widget; skip instead, same as
-    // `_handleMessageUpdated` below.
-    if (index == -1) {
-      return;
-    }
+    _safeSetState(() {
+      final index = _messages.indexWhere((element) => element.id == message.id);
+      // Defensive: this is called from the async `onMessageDelivered`/
+      // `onMessageSent` callbacks, which can arrive after the echoed message
+      // they refer to is gone from `_messages` -- e.g. the user sent a
+      // message (local echo via `_addMessage`), then switched conversations
+      // (`_handleSelectConversation` replaces `_messages` wholesale) before
+      // the delivery/sent confirmation came back. `_messages[-1]` throws a
+      // RangeError in Dart, crashing the widget; skip instead, same as
+      // `_handleMessageUpdated` below.
+      //
+      // Looking up `index` inside `_safeSetState` prevents stale-index race
+      // conditions when spamming messages (where user taps send, inserting
+      // new items at index 0 and shifting previous items, while an async
+      // confirmation is pending).
+      if (index == -1) {
+        return;
+      }
 
-    if (_messages[index].status == types.Status.seen) {
-      return;
-    }
+      if (_messages[index].status == types.Status.seen &&
+          message.status != types.Status.seen) {
+        return;
+      }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() {
-        _messages[index] = message;
-      });
+      final updated = List<types.Message>.of(_messages);
+      updated[index] = message;
+      _messages = updated;
     });
   }
 
   void _handleMessageUpdated(
     types.Message message,
   ) {
-    final index = _messages.indexWhere((element) => element.id == message.id);
-    // Defensive: an update event can arrive for a message this client
-    // hasn't inserted into `_messages` yet (e.g. ordering races between
-    // `message.created`/`message.updated`, or a duplicate-subscription
-    // replay -- see `listenForEvents()` in chatwoot_repository.dart).
-    // `_messages[-1]` throws in Dart (unlike Python), so skip the update
-    // instead of crashing; the message's own insertion (via
-    // `onMessageReceived`/`_addMessage`) is what will show it.
-    if (index == -1) {
-      return;
-    }
+    _safeSetState(() {
+      final index = _messages.indexWhere((element) => element.id == message.id);
+      // Defensive: an update event can arrive for a message this client
+      // hasn't inserted into `_messages` yet (e.g. ordering races between
+      // `message.created`/`message.updated`, or a duplicate-subscription
+      // replay -- see `listenForEvents()` in chatwoot_repository.dart).
+      // `_messages[-1]` throws in Dart (unlike Python), so skip the update
+      // instead of crashing; the message's own insertion (via
+      // `onMessageReceived`/`_addMessage`) is what will show it.
+      if (index == -1) {
+        return;
+      }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() {
-        _messages[index] = message;
-      });
+      final updated = List<types.Message>.of(_messages);
+      updated[index] = message;
+      _messages = updated;
     });
   }
 
@@ -628,22 +675,28 @@ class _ChatwootChatState extends State<ChatwootChat> {
 
     _addMessage(textMessage);
 
-    chatwootClient!
-        .sendMessage(content: textMessage.text, echoId: textMessage.id);
+    chatwootClient
+        ?.sendMessage(content: textMessage.text, echoId: textMessage.id);
     widget.onSendPressed?.call(message);
   }
 
   void _handleSelectConversation(ChatwootConversation conversation) {
-    setState(() {
+    _safeSetState(() {
       _showingChat = true;
       _activeConversation = conversation;
-      _messages = conversation.messages
+      final chatMessages = conversation.messages
           .map((message) => _chatwootMessageToTextMessage(message))
           .toList();
+      final deduped = <String, types.Message>{};
+      for (final m in chatMessages) {
+        deduped[m.id] = m;
+      }
+      final list = deduped.values.toList();
       final now = DateTime.now().millisecondsSinceEpoch;
-      _messages.sort((a, b) {
+      list.sort((a, b) {
         return (b.createdAt ?? now).compareTo(a.createdAt ?? now);
       });
+      _messages = list;
     });
     chatwootClient?.setActiveConversation(conversation);
   }
